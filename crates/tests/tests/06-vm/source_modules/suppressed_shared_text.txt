@@ -1,0 +1,150 @@
+Q = (program
+  .
+  (expression_statement
+    (identifier) @node :: Shared
+  )
+  .
+  (B) @suppressed
+  .
+)
+----------------- INPUT (b.ptk) ------------------
+B = (expression_statement
+  {
+    (identifier) @node :: Shared
+  }* @rows :: text
+)
+---------------- INPUT (input.js) ----------------
+alpha; beta;
+------------------ DIAGNOSTICS -------------------
+warning: capture type `text` replaces the record values captured by `@rows` with source text
+ --> b.ptk:4:6
+  |
+3 |     (identifier) @node :: Shared
+  |                  --------------- this captured value is suppressed by `@rows :: text`
+4 |   }* @rows :: text
+  |      ^^^^^^^^^^^^^
+  |
+help: remove `:: text` to return the record values instead
+--------------------- OUTPUT ---------------------
+{
+  "node": {
+    "kind": "identifier",
+    "span": [0, 5],
+    "text": "alpha"
+  },
+  "suppressed": {
+    "rows": [
+      "beta"
+    ]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "rows"
+S2 "node"
+S3 "suppressed"
+S4 "Shared"
+S5 "B"
+S6 "Q"
+S7 "program"
+S8 "expression_statement"
+S9 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = <Text>
+T2 = ListZeroOrMore(T1)  ; <Text>*
+T3 = Record  M0:1  ; { rows }
+T4 = Alias(T0)
+T5 = Record  M1:2  ; { node, suppressed }
+
+[type_members]
+M0: S1 → T2  ; rows: T2
+M1: S2 → T4  ; node: Shared
+M2: S3 → T3  ; suppressed: B
+
+[type_names]
+N0: S4 → T4  ; Shared
+N1: S5 → T3  ; B
+N2: S6 → T5  ; Q
+
+[entrypoints]
+B = 00 :: T3
+Q = 03 :: T5
+
+[instructions]
+B:
+  00   !   (expression_statement)           01
+  01  -ε-                                   26, 16      [ListOpen]
+
+Q:
+  03   !   (program)                        04
+  04  └•─  (expression_statement)           05
+  05  └‣─  (identifier)                     08          [Node RecordSet(M1 node)]
+  07  ...
+  08  ─‣┘  _                                10          [RecordOpen]
+  10       (@48)                            48 : 11
+  11  ─•┘  _                                13          [RecordClose RecordSet(M2 suppressed)]
+  13       return
+  14       return
+  15  ...
+  16  -ε-                                   14          [ListClose RecordSet(M0 rows)]
+  18  -ε-                                   24, 28      [TextClose ArrayPush]
+  20   !   (identifier)                     18          [ScalarMark]
+  22  -ε-                                   20          [ScalarOpen]
+  24  ──!  _                                22, 24
+  26  └─!  _                                22, 24
+  28  ─‣┘  _                                14          [ListClose RecordSet(M0 rows)]
+  30       return
+  31  ...
+  32  -ε-                                   30          [ListClose RecordSet(M0 rows)]
+  34  -ε-                                   40, 46      [TextClose ArrayPush]
+  36   !   (identifier)                     34          [ScalarMark]
+  38  -ε-                                   36          [ScalarOpen]
+  40  ──!  _                                38, 40
+  42  └─!  _                                38, 40
+  44  -ε-                                   42, 32      [ListOpen]
+  46  ─‣┘  _                                30          [ListClose RecordSet(M0 rows)]
+  48  ─•─  (expression_statement)           44
+--------------------- TRACE ----------------------
+Q:
+  03   !   (program)                        04
+       ●   (program)
+  04  └•─  (expression_statement)           05
+       ●   (expression_statement)
+  05  └‣─  (identifier)                     08          [Node RecordSet(M1 node)]
+       ●   (identifier)
+  08  ─‣┘  _                                10          [RecordOpen]
+       ●   (expression_statement)
+  10       (@48)                            48 : 11
+       ▶   (@48)
+
+@48:
+  48  ─•─  (expression_statement)           44
+       ●   (expression_statement)
+  44  -ε-                                   42, 32      [ListOpen]
+  42  └─!  _                                38, 40
+       ●   (identifier)
+  38  -ε-                                   36          [ScalarOpen]
+  36   !   (identifier)                     34          [ScalarMark]
+       ●   (identifier)
+  34  -ε-                                   40, 46      [TextClose ArrayPush]
+  40  ──!  _                                38, 40
+       ●   ";"
+  38  -ε-                                   36          [ScalarOpen]
+  36   !   (identifier)                     34          [ScalarMark]
+       ○   ";"
+       ○   no candidate
+  40  ❮❮❮
+  40  ──!  _                                38, 40
+       ○   no candidate
+  34  ❮❮❮
+  46  ─‣┘  _                                30          [ListClose RecordSet(M0 rows)]
+       ●   (expression_statement)
+  30   ◀   return                           11
+
+Q:
+  11  ─•┘  _                                13          [RecordClose RecordSet(M2 suppressed)]
+       ●   (program)
+  13   ◀   return                           ◼

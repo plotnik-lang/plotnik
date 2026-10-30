@@ -24,6 +24,21 @@ const RUST_RAW: &[&str] = &[
     "where", "while", "yield",
 ];
 
+pub(crate) fn module_ident(stem: &str) -> Result<String, String> {
+    let mut chars = stem.chars();
+    let valid = chars
+        .next()
+        .is_some_and(|ch| ch.is_ascii_lowercase() || ch == '_')
+        && chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_');
+    if !valid || stem == "_" || stem == "mod" || RUST_UNRAW.contains(&stem) {
+        return Err(format!(
+            "invalid Rust module name `{stem}`. Use a lowercase snake_case query filename. `_`, `mod`, `self`, `super`, and `crate` are reserved."
+        ));
+    }
+
+    Ok(rust_ident(stem))
+}
+
 pub(crate) fn rust_scope_idents<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
     let mut taken = HashSet::new();
     names

@@ -16,7 +16,6 @@ fn standalone(tree: &plotnik::rt::Tree, source: &str) {
     let _ = Wrapped::each(tree.root_node(), source);
     let _ = Choice::find(tree.root_node(), source);
     let _ = Mixed::find_all(tree.root_node(), source);
-    let _ = left_journal(tree, source);
 }
 
 fn main() {}

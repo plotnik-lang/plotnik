@@ -1,0 +1,143 @@
+Q = (program
+  .
+  (Statement) @left
+  .
+  (Statement) @right
+  .
+)
+------------- INPUT (statement.ptk) --------------
+Statement = (expression_statement (Id) @id)
+---------------- INPUT (leaf.ptk) ----------------
+Id = (identifier) @name :: text
+---------------- INPUT (input.js) ----------------
+x; y;
+--------------------- OUTPUT ---------------------
+{
+  "left": {
+    "id": {
+      "name": "x"
+    }
+  },
+  "right": {
+    "id": {
+      "name": "y"
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "id"
+S03 "left"
+S04 "right"
+S05 "Id"
+S06 "Statement"
+S07 "Q"
+S08 "program"
+S09 "expression_statement"
+S10 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { id }
+T3 = Record  M2:2  ; { left, right }
+
+[type_members]
+M0: S01 → T0  ; name: <Text>
+M1: S02 → T1  ; id: Id
+M2: S03 → T2  ; left: Statement
+M3: S04 → T2  ; right: Statement
+
+[type_names]
+N0: S05 → T1  ; Id
+N1: S06 → T2  ; Statement
+N2: S07 → T3  ; Q
+
+[entrypoints]
+Id        = 00 :: T1
+Q         = 11 :: T3
+Statement = 03 :: T2
+
+[instructions]
+Id:
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 name)]
+  02       return
+
+Statement:
+  03   !   (expression_statement)           05          [RecordOpen]
+  05  └‣─  (Id)                             00 : 06
+  06  -ε-                                   08          [RecordClose]
+  08  ─‣┘  _                                10          [RecordSet(M1 id)]
+  10       return
+
+Q:
+  11   !   (program)                        13          [RecordOpen]
+  13       (@34)                            34 : 14
+  14  -ε-                                   16          [RecordClose RecordSet(M2 left) RecordOpen]
+  16       (@30)                            30 : 17
+  17  ─•┘  _                                19          [RecordClose RecordSet(M3 right)]
+  19       return
+  20  -ε-                                   22          [RecordClose]
+  22  ─‣┘  _                                28          [RecordSet(M1 id)]
+  24  -ε-                                   26          [RecordClose]
+  26  ─‣┘  _                                32          [RecordSet(M1 id)]
+  28       return
+  29  └‣─  (Id)                             00 : 20
+  30  ─•─  (expression_statement)           29          [RecordOpen]
+  32       return
+  33  └‣─  (Id)                             00 : 24
+  34  └•─  (expression_statement)           33          [RecordOpen]
+--------------------- TRACE ----------------------
+Q:
+  11   !   (program)                        13          [RecordOpen]
+       ●   (program)
+  13       (@34)                            34 : 14
+       ▶   (@34)
+
+@34:
+  34  └•─  (expression_statement)           33          [RecordOpen]
+       ●   (expression_statement)
+  33  └‣─  (Id)                             00 : 24
+       ●   (identifier)
+       ▶   (Id)
+
+Id:
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 name)]
+       ●   (identifier)
+  02   ◀   return                           24
+
+@34:
+  24  -ε-                                   26          [RecordClose]
+  26  ─‣┘  _                                32          [RecordSet(M1 id)]
+       ●   (expression_statement)
+  32   ◀   return                           14
+
+Q:
+  14  -ε-                                   16          [RecordClose RecordSet(M2 left) RecordOpen]
+  16       (@30)                            30 : 17
+       ▶   (@30)
+
+@30:
+  30  ─•─  (expression_statement)           29          [RecordOpen]
+       ●   (expression_statement)
+  29  └‣─  (Id)                             00 : 20
+       ●   (identifier)
+       ▶   (Id)
+
+Id:
+  00   !   (identifier)                     02          [NodeText RecordSet(M0 name)]
+       ●   (identifier)
+  02   ◀   return                           20
+
+@30:
+  20  -ε-                                   22          [RecordClose]
+  22  ─‣┘  _                                28          [RecordSet(M1 id)]
+       ●   (expression_statement)
+  28   ◀   return                           17
+
+Q:
+  17  ─•┘  _                                19          [RecordClose RecordSet(M3 right)]
+       ●   (program)
+  19   ◀   return                           ◼

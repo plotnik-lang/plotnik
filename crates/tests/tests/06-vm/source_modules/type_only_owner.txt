@@ -1,0 +1,89 @@
+Q = (program
+  (expression_statement
+    (array
+      {
+        (identifier) @first
+        (identifier) @second
+      } @pair :: Pair
+    )
+  )
+)
+---------------- INPUT (pair.ptk) ----------------
+Pair = {
+  (identifier) @first
+  (identifier) @second
+}
+---------------- INPUT (input.js) ----------------
+[alpha, beta];
+--------------------- OUTPUT ---------------------
+{
+  "pair": {
+    "first": {
+      "kind": "identifier",
+      "span": [1, 6],
+      "text": "alpha"
+    },
+    "second": {
+      "kind": "identifier",
+      "span": [8, 12],
+      "text": "beta"
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "first"
+S2 "second"
+S3 "pair"
+S4 "Pair"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "array"
+S9 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { first, second }
+T2 = Record  M2:1  ; { pair }
+
+[type_members]
+M0: S1 → T0  ; first: <Node>
+M1: S2 → T0  ; second: <Node>
+M2: S3 → T1  ; pair: Pair
+
+[type_names]
+N0: S4 → T1  ; Pair
+N1: S5 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           02
+  02  └‣─  (array)                          03
+  03  └‣─  (identifier)                     05          [RecordOpen Node RecordSet(M0 first)]
+  05  ─‣─  (identifier)                     08          [Node RecordSet(M1 second)]
+  07  ...
+  08  ─‣┘³ _                                10          [RecordClose RecordSet(M2 pair)]
+  10       return
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (expression_statement)           02
+       ●   (expression_statement)
+  02  └‣─  (array)                          03
+       ●   (array)
+  03  └‣─  (identifier)                     05          [RecordOpen Node RecordSet(M0 first)]
+       ○   "["
+       ●   (identifier)
+  05  ─‣─  (identifier)                     08          [Node RecordSet(M1 second)]
+       ○   ","
+       ●   (identifier)
+  08  ─‣┘³ _                                10          [RecordClose RecordSet(M2 pair)]
+       ●   (program)
+  10   ◀   return                           ◼

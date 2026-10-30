@@ -1,10 +1,15 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+
 use indexmap::IndexMap;
 use rowan::TextRange;
 
 use crate::compiler::analyze::grammar::bind;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::resolve_names;
-use crate::compiler::analyze::refs::{DefinitionGraph, build_definition_graph, validate_recursion};
+use crate::compiler::analyze::refs::{
+    DefinitionGraph, build_definition_graph, validate_recursion, validate_source_cycles,
+};
 use crate::compiler::analyze::result::{ResultModel, ResultSchema};
 use crate::compiler::analyze::shape::validation::{
     AnchorValidationInput, ShapeValidationInput, validate_anchors, validate_ast,
@@ -17,7 +22,7 @@ use crate::compiler::analyze::{AnalysisArtifacts, Located};
 use crate::compiler::emit::targets::bytecode::tables::EmitError;
 use crate::compiler::emit::{
     BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
-    RustTypesOutput,
+    RustSourceOutput, RustTypesOutput,
 };
 use crate::compiler::lower::ir::SemanticNfa;
 use crate::compiler::lower::spans::assign_spans;
@@ -218,7 +223,6 @@ impl QueryParsed {
         if !anchors_valid {
             return Ok(Query::parsed_only(self));
         }
-        validate_recursion(&definitions, &interner, &mut self.diag);
 
         if !self.diag.has_errors()
             && let Some(expression) = &expression
@@ -249,6 +253,17 @@ impl QueryParsed {
             expression.as_ref(),
             &mut self.diag,
         );
+        if !self.diag.has_errors()
+            && validate_source_cycles(
+                &definitions,
+                &interner,
+                type_analysis.ownership_uses(),
+                &mut self.diag,
+            )
+        {
+            validate_recursion(&definitions, &interner, &mut self.diag);
+        }
+
         if !self.diag.has_errors() {
             check_entrypoints(validated.ast_map(), &interner, &definitions, &mut self.diag);
             if expression.is_none()
@@ -560,6 +575,61 @@ impl CompiledQuery {
         &self,
         config: &RustCodegenConfig,
     ) -> crate::compiler::QueryResult<Emission<RustModuleOutput>> {
+        self.emit_rust(config, |plan, matcher| {
+            crate::compiler::emit::targets::rust::generate(plan, matcher).map(RustModuleOutput::new)
+        })
+    }
+
+    /// Generate a sibling Rust module for each query file.
+    pub fn emit_rust_sources(
+        &self,
+        config: RustCodegenConfig,
+    ) -> crate::compiler::QueryResult<Emission<Vec<RustSourceOutput>>> {
+        config.validate()?;
+        self.emit_rust(&config, |plan, matcher| {
+            let bound = self.bound.bound().expect("valid query is bound");
+            let mut modules = BTreeMap::new();
+            let mut names = BTreeSet::new();
+            for &source in bound.analyzed.parsed.input.modules.keys() {
+                let path = self
+                    .source_map()
+                    .path(source)
+                    .ok_or("file emission requires named query source files")?;
+                let stem = Path::new(path)
+                    .file_stem()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| format!("invalid query filename `{path}`"))?;
+                let name = crate::compiler::emit::targets::rust::module_ident(stem)?;
+                if !names.insert(name.clone()) {
+                    return Err(format!(
+                        "query files have the same Rust module name `{name}`"
+                    ));
+                }
+
+                modules.insert(source, name);
+            }
+
+            let sources =
+                crate::compiler::emit::targets::rust::generate_sources(plan, matcher, &modules)?;
+            Ok(sources
+                .into_iter()
+                .map(|(source_id, source)| RustSourceOutput {
+                    source_id,
+                    module_name: modules[&source_id].clone(),
+                    source,
+                })
+                .collect())
+        })
+    }
+
+    fn emit_rust<T>(
+        &self,
+        config: &RustCodegenConfig,
+        render: impl FnOnce(
+            &crate::compiler::emit::CodegenPlan<'_>,
+            &crate::compiler::emit::targets::rust::Config,
+        ) -> Result<T, String>,
+    ) -> crate::compiler::QueryResult<Emission<T>> {
         if !self.is_valid() {
             return Ok(Emission::invalid_query());
         }
@@ -591,7 +661,7 @@ impl CompiledQuery {
                 return Ok(Emission::failure(diagnostics));
             }
         };
-        let source = match crate::compiler::emit::targets::rust::generate(&plan, &matcher) {
+        let artifact = match render(&plan, &matcher) {
             Ok(source) => source,
             Err(error) => {
                 let mut diagnostics = Diagnostics::new();
@@ -599,10 +669,7 @@ impl CompiledQuery {
                 return Ok(Emission::failure(diagnostics));
             }
         };
-        Ok(Emission::success(
-            RustModuleOutput::new(source),
-            Diagnostics::new(),
-        ))
+        Ok(Emission::success(artifact, Diagnostics::new()))
     }
 
     fn require_static_module(&self) -> crate::compiler::QueryResult<()> {

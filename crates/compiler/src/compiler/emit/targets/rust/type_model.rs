@@ -1,16 +1,21 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::rc::Rc;
 
 use crate::compiler::analyze::result::{ResultItem, ResultSchema};
 use crate::compiler::analyze::types::type_shape::TypeId;
+use crate::compiler::diagnostics::SourceId;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::core::Symbol;
 
 use super::representation::{LifetimeUsage, TypeFacts};
 
+#[derive(Clone)]
 pub(crate) struct TypeModel<'a> {
     schema: ResultSchema<'a>,
-    facts: TypeFacts,
+    facts: Rc<TypeFacts>,
     item_idents: HashMap<Symbol, String>,
+    current_source: Option<SourceId>,
+    item_paths: HashMap<Symbol, String>,
 }
 
 #[derive(Clone, Copy)]
@@ -30,7 +35,7 @@ impl TypeContext {
 
 impl<'a> TypeModel<'a> {
     pub(crate) fn new(schema: ResultSchema<'a>) -> Self {
-        let facts = TypeFacts::compute(schema.types);
+        let facts = Rc::new(TypeFacts::compute(schema.types));
         let interner = schema.interner;
         let items = schema.entrypoint_items();
         let idents = rust_scope_idents(items.iter().map(|item| interner.resolve(item.name)));
@@ -43,7 +48,54 @@ impl<'a> TypeModel<'a> {
             schema,
             facts,
             item_idents,
+            current_source: None,
+            item_paths: HashMap::new(),
         }
+    }
+
+    pub(crate) fn in_module(
+        mut self,
+        source: SourceId,
+        modules: &BTreeMap<SourceId, String>,
+    ) -> Self {
+        self.current_source = Some(source);
+        self.item_paths = self
+            .item_idents
+            .iter()
+            .map(|(&name, ident)| {
+                let owner = self.item_source(name);
+                let path = if owner == source {
+                    ident.clone()
+                } else {
+                    let module = modules
+                        .get(&owner)
+                        .expect("every foreign public item owner has a Rust module");
+                    format!("super::{module}::{ident}")
+                };
+                (name, path)
+            })
+            .collect();
+        self
+    }
+
+    pub(crate) fn source(&self) -> Option<SourceId> {
+        self.current_source
+    }
+
+    pub(crate) fn item_source(&self, name: Symbol) -> SourceId {
+        self.schema
+            .types
+            .type_source(name)
+            .expect("module placement requires unambiguous analyzed ownership")
+    }
+
+    pub(crate) fn item_path(&self, name: Symbol) -> &str {
+        if self.current_source.is_none() {
+            return self.item_ident(name);
+        }
+        self.item_paths
+            .get(&name)
+            .expect("module context provides a path for every public item")
     }
 
     pub(crate) fn schema(&self) -> &ResultSchema<'a> {

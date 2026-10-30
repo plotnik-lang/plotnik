@@ -912,7 +912,7 @@ Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes a
 
 `//` and `;` begin line comments. `/* ... */` encloses a block comment.
 
-A first-line comment can tag a file with a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`. When compiling a directory, Plotnik includes files tagged for the selected grammar and files without a tag.
+A first-line comment can tag a file with a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`.
 
 ### Check a query
 
@@ -921,7 +921,7 @@ Use `check` to validate a query against a grammar, `dump` to inspect its bytecod
 ```sh
 plotnik check query.ptk --lang javascript
 plotnik dump query.ptk --lang javascript
-plotnik gen query.ptk --lang javascript --target rust
+plotnik gen queries/ --lang javascript
 ```
 
 ## A complete example

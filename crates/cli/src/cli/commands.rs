@@ -46,31 +46,26 @@ Run 'plotnik <command> --help' for options."#,
 
 pub fn generate_command() -> Command {
     Command::new("gen")
-        .visible_alias("generate")
-        .about("Generate a compiled matcher module")
-        .override_usage(
-            "\
-  plotnik gen <PATH> --lang <LANG> --target rust [-o <FILE>]
-  plotnik gen - --lang <LANG> --target rust [-o <FILE>]",
-        )
+        .about("Generate Rust matchers from a query folder")
         .after_help(
             r#"EXAMPLES:
-  plotnik gen query.ptk --lang javascript --target rust
-  plotnik gen query.ptk --lang javascript --target rust -o query.rs
+  plotnik gen
+  plotnik gen queries/ --lang javascript
 
-PATH is a PTK file or directory. '-' reads a named PTK module from stdin.
---lang selects the grammar. Tags group directory members by language.
-The generated module imports `plotnik_runtime`. Depend on `plotnik-runtime` to use it.
-The module records the exact grammar name, SHA-256, and source used during
-binding."#,
+Each .ptk file produces a .rs file beside it. Subfolders are not searched.
+A first-line language tag selects the grammar. Use --lang for untagged files.
+Add plotnik-runtime to your Rust dependencies to use the matchers."#,
         )
-        .arg(query_path_arg())
+        .arg(
+            Arg::new("query_path")
+                .value_name("FOLDER")
+                .value_parser(value_parser!(PathBuf))
+                .default_value(".")
+                .help("Query folder"),
+        )
         .next_help_heading("Input options")
-        .arg(lang_arg().required(true))
+        .arg(lang_arg().help("Grammar for untagged files"))
         .arg(cache_dir_arg())
-        .next_help_heading("Generation options")
-        .arg(target_arg())
-        .arg(output_file_arg())
         .next_help_heading("Global options")
         .arg(color_arg())
 }

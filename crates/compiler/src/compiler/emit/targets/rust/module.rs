@@ -1,699 +1,667 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, EntryBoundary, PredicateOp};
+use crate::compiler::diagnostics::SourceId;
 use crate::compiler::emit::plan::{
-    CallPlan, CheckPlan, CodegenPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, PredicatePlan,
-    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
+    BlockKind, CallPlan, CheckPlan, CodegenPlan, DefinitionPlan, EffectPlan, FlowPlan, KindClass,
+    MatchPlan, PredicatePlan, PredicateValuePlan, RegexId, StateId, StatePlan, StatePlanKind,
 };
 use crate::compiler::emit::sink::Sink;
-use crate::compiler::emit::targets::rust::Config;
-use crate::compiler::emit::targets::rust::TypeModel;
 use crate::compiler::emit::targets::rust::decode::DecoderGen;
-use crate::compiler::emit::targets::rust::ident::{shouty_ident, snake_ident};
-use crate::compiler::emit::targets::rust::literal::{decimal_byte_lines, rust_string};
-use crate::compiler::emit::targets::rust::template::splice;
+use crate::compiler::emit::targets::rust::ident::shouty_ident;
+use crate::compiler::emit::targets::rust::literal::{rust_byte_string, rust_string};
+use crate::compiler::emit::targets::rust::{Config, TypeModel};
+use crate::compiler::ids::DefId;
 use crate::compiler::regex::compile_native_dfa;
 use crate::core::NodeFieldId;
 use plotnik_runtime::{Limit, Nav, SkipPolicy};
 
-use super::entry_names::{apply_fn_name, journal_fn_name};
+use super::entry_names::apply_fn_name;
 
 pub(crate) fn generate(plan: &CodegenPlan<'_>, config: &Config) -> Result<String, String> {
-    let generator = Generator::new(plan, config)?;
-    Ok(generator.render())
+    let rust = RustRepresentation::from_plan(plan.matcher())?;
+    Generator::new(plan, config, &rust).render(TypeModel::new(*plan.result()))
 }
 
-struct StateInfo {
-    id: u16,
-    const_name: String,
-    fn_stem: String,
-}
-
-#[derive(Clone, Copy)]
-enum CandidateFailure {
-    StateBacktrack,
-    RetryExhausted,
-}
-
-impl CandidateFailure {
-    fn code(self) -> &'static str {
-        match self {
-            CandidateFailure::StateBacktrack => "break 'state Flow::Backtrack;",
-            CandidateFailure::RetryExhausted => "return None;",
-        }
+pub(crate) fn generate_sources(
+    plan: &CodegenPlan<'_>,
+    config: &Config,
+    modules: &BTreeMap<SourceId, String>,
+) -> Result<Vec<(SourceId, String)>, String> {
+    let rust = RustRepresentation::from_plan(plan.matcher())?;
+    let schema = plan.result();
+    let types = TypeModel::new(*schema);
+    let mut errors = Vec::new();
+    for item in types.items() {
+        let Err(sites) = schema.types.type_source(item.name) else {
+            continue;
+        };
+        let locations = sites
+            .iter()
+            .map(|span| {
+                let module = modules
+                    .get(&span.source)
+                    .expect("every participating source has a Rust module");
+                format!(
+                    "{}.ptk at bytes {:?}",
+                    module.trim_start_matches("r#"),
+                    span.range
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        errors.push(format!(
+            "ambiguous source ownership for Rust type `{}`: {locations}. Define the type in one query file or use distinct type names.",
+            schema.interner.resolve(item.name),
+        ));
     }
-}
-
-struct CandidateCheck {
-    comment: String,
-    fail: String,
-}
-
-impl CandidateCheck {
-    fn new(comment: impl Into<String>, fail: impl Into<String>) -> Self {
-        Self {
-            comment: comment.into(),
-            fail: fail.into(),
-        }
+    if !errors.is_empty() {
+        return Err(errors.join("\n"));
     }
-}
 
-struct RegexStatic {
-    id: RegexId,
-    bytes: Vec<u8>,
-}
-
-impl RegexStatic {
-    fn compile(
-        id: RegexId,
-        source: &str,
-        pattern: &regex_syntax::hir::Hir,
-    ) -> Result<Self, String> {
-        let bytes = compile_native_dfa(pattern)
-            .map_err(|error| format!("regex compile error for {source:?}: {error}"))?;
-        Ok(Self { id, bytes })
-    }
+    modules
+        .keys()
+        .map(|&source| {
+            let mut generator = Generator::new(plan, config, &rust);
+            generator.source = Some(source);
+            generator.modules = Some(modules);
+            Ok((
+                source,
+                generator.render(types.clone().in_module(source, modules))?,
+            ))
+        })
+        .collect()
 }
 
 struct RustRepresentation {
-    states: Vec<StateInfo>,
     fields: BTreeMap<NodeFieldId, String>,
-    regexes: Vec<RegexStatic>,
+    regexes: BTreeMap<RegexId, Vec<u8>>,
 }
 
 impl RustRepresentation {
     fn from_plan(plan: &crate::compiler::emit::plan::MatcherPlan) -> Result<Self, String> {
-        let width = plan.label_width();
-        let states = plan
-            .states()
-            .iter()
-            .map(|state| {
-                let suffix = match state.origin {
-                    StateOrigin::Definition => "",
-                    StateOrigin::ConsumingDefinition => "_plus",
-                };
-                StateInfo {
-                    id: state.id.raw(),
-                    const_name: format!(
-                        "S{:0width$}_{}{}",
-                        state.label.0,
-                        shouty_ident(&state.definition),
-                        suffix.to_uppercase()
-                    ),
-                    fn_stem: format!(
-                        "s{:0width$}_{}{}",
-                        state.label.0,
-                        snake_ident(&state.definition),
-                        suffix
-                    ),
-                }
-            })
-            .collect();
-
         let regexes = plan
             .regexes()
             .iter()
-            .map(|regex| RegexStatic::compile(regex.id, &regex.pattern, &regex.normalized))
-            .collect::<Result<Vec<_>, _>>()?;
-        let mut representation = Self {
-            states,
-            fields: BTreeMap::new(),
-            regexes,
-        };
+            .map(|regex| {
+                let bytes = compile_native_dfa(&regex.normalized).map_err(|error| {
+                    format!("cannot compile regex {:?}: {error}", regex.pattern)
+                })?;
+                Ok((regex.id, bytes))
+            })
+            .collect::<Result<_, String>>()?;
+        let mut fields = BTreeMap::new();
         for field in plan.fields() {
-            representation.record_field(field.id, &field.name);
+            let mut name = format!("F_{}", shouty_ident(&field.name));
+            while fields.values().any(|taken| *taken == name) {
+                let _ = write!(name, "_{}", field.id);
+            }
+            fields.insert(field.id, name);
         }
-        Ok(representation)
-    }
-
-    fn record_field(&mut self, id: NodeFieldId, display: &str) {
-        if self.fields.contains_key(&id) {
-            return;
-        }
-        let mut name = format!("F_{}", shouty_ident(display));
-        while self.fields.values().any(|taken| *taken == name) {
-            let _ = write!(name, "_{id}");
-        }
-        self.fields.insert(id, name);
-    }
-
-    fn state(&self, id: StateId) -> &StateInfo {
-        self.states
-            .get(usize::from(id.raw()))
-            .expect("every planned state has a Rust representation")
+        Ok(Self { fields, regexes })
     }
 }
 
 struct Generator<'a> {
     config: &'a Config,
     plan: &'a CodegenPlan<'a>,
-    rust: RustRepresentation,
-    has_calls: bool,
+    rust: &'a RustRepresentation,
+    source: Option<SourceId>,
+    modules: Option<&'a BTreeMap<SourceId, String>>,
 }
 
 impl<'a> Generator<'a> {
-    fn new(plan: &'a CodegenPlan<'a>, config: &'a Config) -> Result<Self, String> {
-        let rust = RustRepresentation::from_plan(plan.matcher())?;
-        let has_calls = plan
-            .matcher()
-            .states()
-            .iter()
-            .any(|state| matches!(state.kind, StatePlanKind::Call(_)));
-        Ok(Self {
+    fn new(plan: &'a CodegenPlan<'a>, config: &'a Config, rust: &'a RustRepresentation) -> Self {
+        Self {
             config,
             plan,
             rust,
-            has_calls,
+            source: None,
+            modules: None,
+        }
+    }
+
+    fn owns(&self, definition: DefId) -> bool {
+        self.source.is_none_or(|source| {
+            self.plan
+                .result()
+                .definitions
+                .definition(definition)
+                .source()
+                == source
         })
     }
 
-    fn state(&self, id: StateId) -> &StateInfo {
-        self.rust.state(id)
+    fn has_entries(&self) -> bool {
+        self.plan
+            .matcher()
+            .entrypoints()
+            .iter()
+            .any(|entry| self.owns(entry.definition))
     }
 
-    fn field_const(&self, field: NodeFieldId) -> String {
+    fn field_const(&self, field: NodeFieldId) -> &str {
         self.rust
             .fields
             .get(&field)
-            .expect("every rendered field was recorded during operand collection")
-            .clone()
+            .expect("rendered field has a Rust identifier")
     }
 
-    fn regex_static(&self, id: RegexId) -> String {
-        format!("RE_{}", id.index())
+    fn runner_path(&self, definition: DefId) -> String {
+        let runner = format!("run_{}", definition.index());
+        if self.owns(definition) {
+            return runner;
+        }
+        let source = self
+            .plan
+            .result()
+            .definitions
+            .definition(definition)
+            .source();
+        let module = self
+            .modules
+            .expect("split output has module names")
+            .get(&source)
+            .expect("callee owner has a Rust module");
+        format!("super::super::{module}::matcher::{runner}")
     }
 
-    fn render(&self) -> String {
-        let rust_config = &self.config.rust_types;
-        let type_model = TypeModel::new(*self.plan.result());
-        let decoders = DecoderGen::new(self.plan.result(), &type_model, self.plan.decode());
-
+    fn render(&self, types: TypeModel<'_>) -> Result<String, String> {
+        let mut entry_names = HashMap::new();
+        for entry in self
+            .plan
+            .matcher()
+            .entrypoints()
+            .iter()
+            .filter(|entry| self.owns(entry.definition))
+        {
+            if let Some(previous) = entry_names.insert(apply_fn_name(&entry.name), &entry.name) {
+                return Err(format!(
+                    "definitions `{previous}` and `{}` have the same snake_case name. Rename one.",
+                    entry.name
+                ));
+            }
+        }
+        let decoders = DecoderGen::new(self.plan.result(), &types, self.plan.decode());
         let mut out = String::new();
         self.header(&mut out);
-        out.push('\n');
-        out.push_str(&crate::compiler::emit::targets::rust::emit_model(
-            &type_model,
-            rust_config,
-        ));
+        out.push_str(&super::emit_model(&types, &self.config.rust_types));
         out.push_str(
             &decoders.execution_api(
                 self.plan
                     .matcher()
                     .entrypoints()
                     .iter()
+                    .filter(|entry| self.owns(entry.definition))
                     .map(|entry| entry.definition),
             ),
         );
         out.push_str(&decoders.decoders());
-        self.entry_reexports(&mut out);
+        if !self.has_entries()
+            && !self
+                .plan
+                .matcher()
+                .definitions()
+                .iter()
+                .any(|definition| self.owns(definition.owner))
+        {
+            return Ok(out);
+        }
 
         let mut machinery = String::new();
-        let decoder_frame_bytes = decoders
-            .uses_decode_depth()
-            .then(|| decoders.max_decoder_frame_bytes());
-        self.mod_header(&mut machinery, decoder_frame_bytes);
-        self.language_check(&mut machinery);
-        self.field_consts(&mut machinery);
-        self.regex_statics(&mut machinery);
-        self.state_consts(&mut machinery);
-        if self.has_calls {
-            self.call_return_fn(&mut machinery);
+        let _ = writeln!(machinery, "use {} as rt;", self.config.rt_crate_path());
+        machinery.push_str("use rt::Flow;\n");
+        if self.has_entries() {
+            self.grammar(&mut machinery);
+            if decoders.uses_decode_depth() {
+                let _ = writeln!(
+                    machinery,
+                    "pub(super) const MAX_DECODE_DEPTH: Option<u64> = {};",
+                    depth_expr(self.config.decode_depth, decoders.max_decoder_frame_bytes())
+                );
+            }
         }
+        self.shared_data(&mut machinery);
         self.entry_fns(&mut machinery);
-        self.driver_fn(&mut machinery);
-        self.dispatch_fn(&mut machinery);
-        self.cand_fns(&mut machinery);
-        self.finish_fns(&mut machinery);
-        self.backtrack_fn(&mut machinery);
-        self.match_retry_fn(&mut machinery);
-
-        out.push('\n');
-        out.push_str("/// The compiled matcher: engine machinery shielded from the query's\n");
-        out.push_str("/// type namespace.\n");
-        out.push_str("mod matcher {\n");
+        for definition in self
+            .plan
+            .matcher()
+            .definitions()
+            .iter()
+            .filter(|definition| self.owns(definition.owner))
+        {
+            self.definition(&mut machinery, definition);
+        }
+        out.push_str(if self.source.is_some() {
+            "\npub(super) mod matcher {\n"
+        } else {
+            "\nmod matcher {\n"
+        });
         let mut nested = Sink::new();
-        nested.indented(|nested| nested.lines(&machinery));
+        nested.indented(|sink| sink.lines(&machinery));
         out.push_str(nested.plain());
         out.push_str("}\n");
-        out
+        Ok(out)
     }
 
     fn header(&self, out: &mut String) {
         if let Some(identity) = &self.config.grammar_identity {
-            let _ = writeln!(out, "// Grammar name: {:?}", identity.name);
-            let _ = writeln!(out, "// Grammar SHA-256: {}", identity.sha256);
-            let _ = writeln!(out, "// Grammar source: {:?}", identity.source);
+            let _ = writeln!(out, "// Grammar: {:?}", identity.name);
+            let _ = writeln!(out, "// SHA-256: {}", identity.sha256);
+            let _ = writeln!(out, "// Source: {:?}", identity.source);
         }
-        splice(
+        let _ = writeln!(out, "use {} as rt;\n", self.config.rt_crate_path());
+        let _ = writeln!(
             out,
-            "",
-            HEADER,
-            &[
-                ("RT", self.config.rt_crate_path()),
-                ("ABI", &plotnik_runtime::RUNTIME_ABI.to_string()),
-            ],
+            "const _: () = assert!(rt::RUNTIME_ABI == {}, \"runtime interface mismatch\");\n",
+            plotnik_runtime::RUNTIME_ABI
         );
     }
 
-    fn entry_reexports(&self, out: &mut String) {
-        let mut names: Vec<String> = self
+    fn grammar(&self, out: &mut String) {
+        out.push_str("\npub(super) static GRAMMAR: rt::Grammar = rt::Grammar {\n    kinds: &[\n");
+        for expected in self.plan.matcher().expected_kinds() {
+            let _ = writeln!(
+                out,
+                "        ({}, {}, {}),",
+                expected.id,
+                rust_string(&expected.name),
+                expected.named
+            );
+        }
+        out.push_str("    ],\n    fields: &[\n");
+        let mut fields = self.plan.matcher().fields().iter().collect::<Vec<_>>();
+        fields.sort_unstable_by_key(|field| field.id);
+        for field in fields {
+            let _ = writeln!(out, "        ({}, {}),", field.id, rust_string(&field.name));
+        }
+        out.push_str("    ],\n    identity: ");
+        if let Some(identity) = &self.config.grammar_identity {
+            let _ = writeln!(
+                out,
+                "Some(({}, {}, {})),",
+                rust_string(&identity.name),
+                rust_string(&identity.source),
+                rust_string(&identity.sha256)
+            );
+        } else {
+            out.push_str("None,\n");
+        }
+        out.push_str("};\n");
+    }
+
+    fn shared_data(&self, out: &mut String) {
+        let mut fields = BTreeSet::new();
+        let mut regexes = BTreeSet::new();
+        for state in self
+            .plan
+            .matcher()
+            .states()
+            .iter()
+            .filter(|state| self.owns(state.owner))
+        {
+            let checks = match &state.kind {
+                StatePlanKind::Switch(cases) => cases
+                    .iter()
+                    .flat_map(|case| &case.action.checks)
+                    .collect::<Vec<_>>(),
+                StatePlanKind::Match(plan) => plan.action.checks.iter().collect(),
+                StatePlanKind::Call(plan) => {
+                    fields.extend(plan.field);
+                    Vec::new()
+                }
+                _ => Vec::new(),
+            };
+            for check in checks {
+                match check {
+                    CheckPlan::Field(field) | CheckPlan::NegField(field) => {
+                        fields.insert(field.id);
+                    }
+                    CheckPlan::Predicate(PredicatePlan {
+                        value: PredicateValuePlan::Regex { id, .. },
+                        ..
+                    }) => {
+                        regexes.insert(*id);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        for field in fields {
+            let _ = writeln!(
+                out,
+                "const {}: rt::NodeFieldId = rt::NodeFieldId::from_raw({field});",
+                self.field_const(field)
+            );
+        }
+        for id in regexes {
+            let bytes = &self.rust.regexes[&id];
+            let _ = writeln!(
+                out,
+                "static RE_{}: rt::StaticDfa = rt::StaticDfa::new({});",
+                id.index(),
+                rust_byte_string(bytes)
+            );
+        }
+    }
+
+    fn entry_fns(&self, out: &mut String) {
+        for entry in self
             .plan
             .matcher()
             .entrypoints()
             .iter()
-            .map(|entry| journal_fn_name(&entry.name))
-            .collect();
-        names.sort();
-        out.push('\n');
-        if let [name] = names.as_slice() {
-            let _ = writeln!(out, "pub use self::matcher::{name};");
-        } else {
-            let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
-        }
-    }
-
-    fn mod_header(&self, out: &mut String, decoder_frame_bytes: Option<u64>) {
-        splice(out, "", MOD_HEADER, &[("RT", self.config.rt_crate_path())]);
-        if let Some(frame_bytes) = decoder_frame_bytes {
-            splice(
-                out,
-                "",
-                DECODE_DEPTH_CONST,
-                &[("DEPTH", &depth_expr(self.config.decode_depth, frame_bytes))],
-            );
-        }
-    }
-
-    fn language_check(&self, out: &mut String) {
-        out.push('\n');
-        if let Some(identity) = &self.config.grammar_identity {
-            let _ = writeln!(
-                out,
-                "const GRAMMAR_NAME: &str = {};",
-                rust_string(&identity.name)
-            );
-            let _ = writeln!(
-                out,
-                "const GRAMMAR_SHA256: &str = {};",
-                rust_string(&identity.sha256)
-            );
-            let _ = writeln!(
-                out,
-                "const GRAMMAR_SOURCE: &str = {};",
-                rust_string(&identity.source)
-            );
-            out.push('\n');
-        }
-        out.push_str(
-            "/// Node-kind ids baked into the candidate checks: `(id, name, is_named)`\n\
-             /// as the generation-time grammar defines them.\n",
-        );
-        let matcher = self.plan.matcher();
-        render_const_slice(
-            out,
-            "const EXPECTED_KINDS: &[(u16, &str, bool)]",
-            matcher.expected_kinds().iter().map(|expected| {
-                let id = expected.id;
-                let named = expected.named;
-                let name = rust_string(&expected.name);
-                format!("({id}, {name}, {named})")
-            }),
-            2,
-        );
-        out.push('\n');
-        out.push_str("/// Field ids baked into the field checks: `(id, name)`.\n");
-        let mut expected_fields = matcher.fields().iter().collect::<Vec<_>>();
-        expected_fields.sort_unstable_by_key(|field| field.id);
-        render_const_slice(
-            out,
-            "const EXPECTED_FIELDS: &[(u16, &str)]",
-            expected_fields.into_iter().map(|field| {
-                let id = field.id;
-                let name = rust_string(&field.name);
-                format!("({id}, {name})")
-            }),
-            3,
-        );
-        out.push('\n');
-        let template = if self.config.grammar_identity.is_some() {
-            VERIFY_LANGUAGE_WITH_IDENTITY
-        } else {
-            VERIFY_LANGUAGE
-        };
-        splice(out, "", template, &[]);
-    }
-
-    fn field_consts(&self, out: &mut String) {
-        if self.rust.fields.is_empty() {
-            return;
-        }
-        out.push('\n');
-        for (id, name) in &self.rust.fields {
-            let _ = writeln!(
-                out,
-                "const {name}: rt::NodeFieldId = rt::NodeFieldId::from_raw({id});"
-            );
-        }
-    }
-
-    fn regex_statics(&self, out: &mut String) {
-        for (plan, regex) in self.plan.matcher().regexes().iter().zip(&self.rust.regexes) {
-            let pattern = &plan.pattern;
-            out.push('\n');
-            let _ = writeln!(out, "// /{pattern}/ — serialized sparse DFA");
-            out.push_str("#[rustfmt::skip]\n");
-            let _ = writeln!(
-                out,
-                "static RE_{}: rt::StaticDfa = rt::StaticDfa::new(&[",
-                regex.id.index()
-            );
-            out.push_str(&decimal_byte_lines(&regex.bytes, 16, "    "));
-            out.push_str("]);\n");
-        }
-    }
-
-    fn state_consts(&self, out: &mut String) {
-        out.push('\n');
-        out.push_str("// Dense runtime state ids, in NFA label order.\n");
-        let mut current: Option<&str> = None;
-        for state in self.plan.matcher().states() {
-            let def = state.definition.as_str();
-            if current != Some(def) {
-                let _ = writeln!(out, "// {def}:");
-                current = Some(def);
-            }
-            let info = self.state(state.id);
-            let _ = writeln!(out, "const {}: u16 = {};", info.const_name, info.id);
-        }
-    }
-
-    fn call_return_fn(&self, out: &mut String) {
-        out.push('\n');
-        out.push_str(
-            "/// Resolve a callee-local return port through the immutable call-site map.\n",
-        );
-        out.push_str("#[inline]\n");
-        out.push_str("fn call_return(call_site: u16, port: rt::PortId) -> u16 {\n");
-        out.push_str("    match (call_site, port.to_byte()) {\n");
-        for state in self.plan.matcher().states() {
-            let StatePlanKind::Call(plan) = &state.kind else {
-                continue;
+            .filter(|entry| self.owns(entry.definition))
+        {
+            let boundary = match entry.boundary {
+                EntryBoundary::Passthrough => "rt::EntryBoundary::new(false, false)",
+                EntryBoundary::Node => "rt::EntryBoundary::new(false, true)",
+                EntryBoundary::Record => "rt::EntryBoundary::new(true, false)",
             };
-            let call_site = &self.state(state.id).const_name;
-            for (port, &target) in plan.returns.iter().enumerate() {
-                let target = &self.state(target).const_name;
-                let _ = writeln!(out, "        ({call_site}, {port}) => {target},");
+            let _ = writeln!(
+                out,
+                "\npub(super) fn {}<'a, 't>(eng: &'a mut rt::MatcherEngine<'t>, source: &str) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {{",
+                apply_fn_name(&entry.name)
+            );
+            let _ = writeln!(
+                out,
+                "    rt::Matcher {{ runner: {} }}.run(eng, source, {}, {boundary})",
+                self.runner_path(entry.definition),
+                self.plan.matcher().block(entry.entry)
+            );
+            out.push_str("}\n");
+        }
+    }
+
+    fn definition(&self, out: &mut String, definition: &DefinitionPlan) {
+        let name = self.plan.result().interner.resolve(
+            self.plan
+                .result()
+                .definitions
+                .definition(definition.owner)
+                .name(),
+        );
+        let _ = writeln!(out, "\n// {name}\n");
+        for state in self
+            .plan
+            .matcher()
+            .states()
+            .iter()
+            .filter(|state| state.owner == definition.owner)
+        {
+            if let StatePlanKind::Call(call) = &state.kind {
+                let callee = self.plan.matcher().state(call.target).owner;
+                let returns = call
+                    .returns
+                    .iter()
+                    .map(|&target| self.plan.matcher().block(target).to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let _ = writeln!(
+                    out,
+                    "static CALL_{}: rt::Call = rt::Call {{",
+                    state.id.raw()
+                );
+                let _ = writeln!(out, "    runner: {},", self.runner_path(callee));
+                let _ = writeln!(
+                    out,
+                    "    entry: {},",
+                    self.plan.matcher().block(call.target)
+                );
+                let _ = writeln!(
+                    out,
+                    "    returns: &[{returns}],\n    site: {},\n}};",
+                    state.id.raw()
+                );
             }
         }
-        out.push_str("        _ => unreachable!(\n");
-        out.push_str("            \"call site {call_site} has no return port {}\",\n");
-        out.push_str("            port.to_byte()\n");
-        out.push_str("        ),\n");
-        out.push_str("    }\n");
+        let loops = definition.blocks.iter().any(|block| {
+            let terminal = match &block.kind {
+                BlockKind::States(states) => *states.last().expect("local blocks contain states"),
+                BlockKind::Retry(state) => *state,
+            };
+            self.plan
+                .matcher()
+                .state(terminal)
+                .flows()
+                .iter()
+                .any(|flow| !matches!(flow, FlowPlan::Accept))
+        });
+        let block_parameter = if loops { "mut block" } else { "block" };
+        let _ = writeln!(
+            out,
+            "pub(crate) fn run_{}(eng: &mut rt::MatcherEngine<'_>, source: &str, {block_parameter}: u32) -> Flow {{",
+            definition.owner.index()
+        );
+        out.push_str("    let _ = (&eng, &source);\n");
+        if loops {
+            out.push_str("    'run: loop {\n");
+            out.push_str("        return match block {\n");
+        } else {
+            out.push_str("        match block {\n");
+        }
+        for block in &definition.blocks {
+            let _ = writeln!(out, "            {} => {{", block.id);
+            match &block.kind {
+                BlockKind::States(states) => {
+                    for (index, &id) in states.iter().enumerate() {
+                        self.state_body(
+                            out,
+                            self.plan.matcher().state(id),
+                            states.get(index + 1).copied(),
+                        );
+                    }
+                }
+                BlockKind::Retry(id) => self.retry(out, self.plan.matcher().state(*id)),
+            }
+            out.push_str("            }\n");
+        }
+        out.push_str(
+            "            _ => unreachable!(\"invalid local runner block {block}\"),\n        }",
+        );
+        if loops {
+            out.push_str(";\n    }\n");
+        } else {
+            out.push('\n');
+        }
         out.push_str("}\n");
     }
 
-    fn entry_fns(&self, out: &mut String) {
-        for entry in self.plan.matcher().entrypoints() {
-            let def = entry.name.as_str();
-            let info = self.state(entry.entry);
-            let boundary = match entry.boundary {
-                EntryBoundary::Passthrough => "EntryBoundary::new(false, false)",
-                EntryBoundary::Node => "EntryBoundary::new(false, true)",
-                EntryBoundary::Record => "EntryBoundary::new(true, false)",
-            };
-            let driver = "run_at_node";
-            let state = &info.const_name;
-            let args = format!("eng, source, {state}, {boundary}");
-            let compact = format!("    {driver}({args})");
-            let apply_call = if compact.len() + 4 <= 100 && args.len() <= 60 {
-                compact
-            } else {
-                format!(
-                    "    {driver}(\n        eng,\n        source,\n        {state},\n        {boundary},\n    )"
-                )
-            };
-            let subs = [
-                ("DEF", def),
-                ("JOURNAL_FN", &journal_fn_name(def)),
-                ("APPLY_FN", &apply_fn_name(def)),
-                ("APPLY_CALL", apply_call.as_str()),
-                ("ENTRY", info.const_name.as_str()),
-                ("BOUNDARY", boundary),
-            ];
-            out.push('\n');
-            splice(out, "", JOURNAL_ENTRY_FN, &subs);
-            out.push('\n');
-            splice(out, "", APPLY_ENTRY_FN, &subs);
+    fn state_body(&self, out: &mut String, state: &StatePlan, next: Option<StateId>) {
+        for line in state.provenance.lines() {
+            let _ = writeln!(out, "                // {}", line.trim_end());
+        }
+        match &state.kind {
+            StatePlanKind::Epsilon { effects, flow } => {
+                self.effects_and_flow(out, effects, flow, next, "                ")
+            }
+            StatePlanKind::Match(plan) => {
+                if plan.navigates() {
+                    self.navigate(out, plan.nav);
+                }
+                self.candidate_search(out, plan);
+                self.retry_checkpoint(out, state);
+                self.effects_and_flow(
+                    out,
+                    &plan.action.effects,
+                    &plan.action.flow,
+                    next,
+                    "                ",
+                );
+            }
+            StatePlanKind::Call(plan) => {
+                if plan.caller_owned() {
+                    if !plan.stays_on_current_node() {
+                        self.navigate(out, plan.nav);
+                    }
+                    self.call_field(out, plan);
+                    self.retry_checkpoint(out, state);
+                }
+                let _ = writeln!(out, "                Flow::Call(&CALL_{})", state.id.raw());
+            }
+            StatePlanKind::Return(port) => {
+                let _ = writeln!(
+                    out,
+                    "                Flow::Return(rt::PortId::from_raw({}))",
+                    port.to_byte()
+                );
+            }
+            StatePlanKind::Switch(cases) => {
+                out.push_str("                let node = eng.node();\n                match node.kind_id() {\n");
+                for case in cases {
+                    let _ = writeln!(out, "                    {} => {{", case.kind);
+                    for effects in &case.prefix {
+                        for effect in effects {
+                            self.effect_stmt(out, effect, "                        ");
+                        }
+                    }
+                    for check in &case.action.checks {
+                        let fail = self.check_failure(check);
+                        let _ = writeln!(
+                            out,
+                            "                        if {fail} {{ return Flow::Backtrack; }}"
+                        );
+                    }
+                    self.effects_and_flow(
+                        out,
+                        &case.action.effects,
+                        &case.action.flow,
+                        None,
+                        "                        ",
+                    );
+                    out.push_str("                    }\n");
+                }
+                out.push_str("                    _ => Flow::Backtrack,\n                }\n");
+            }
         }
     }
 
-    fn driver_fn(&self, out: &mut String) {
-        let (
-            flow_call_error_variant,
-            unwound_call_error_variant,
-            flow_call_error_arm,
-            unwound_call_error_arm,
-        ) = if self.has_calls {
-            (
-                concat!(
-                    "\n    /// Source-driven call state exceeded a fixed-width runtime capacity.\n",
-                    "    CallFrameError(rt::CallFrameError),"
-                ),
-                "\n    CallFrameError(rt::CallFrameError),",
-                "\n            Flow::CallFrameError(error) => return Err(error.into()),",
-                "\n                Unwound::CallFrameError(error) => return Err(error.into()),",
-            )
-        } else {
-            ("", "", "", "")
-        };
-        splice(
+    fn navigate(&self, out: &mut String, nav: Nav) {
+        let _ = writeln!(
             out,
-            "",
-            DRIVER_SKELETON,
-            &[
-                ("FLOW_CALL_ERROR_VARIANT", flow_call_error_variant),
-                ("UNWOUND_CALL_ERROR_VARIANT", unwound_call_error_variant),
-                ("FLOW_CALL_ERROR_ARM", flow_call_error_arm),
-                ("UNWOUND_CALL_ERROR_ARM", unwound_call_error_arm),
-            ],
+            "                if eng.cursor_mut().navigate(rt::Nav::{nav:?}).is_none() {{ return Flow::Backtrack; }}"
         );
     }
 
-    fn dispatch_fn(&self, out: &mut String) {
-        let source_param = if self.plan.matcher().any_predicate() {
-            "source"
-        } else {
-            "_source"
-        };
-        out.push('\n');
-        splice(out, "", DISPATCH_OPEN, &[("SOURCE", source_param)]);
-        for state in self.plan.matcher().states() {
-            for line in state.provenance.lines() {
-                let _ = writeln!(out, "        // {}", line.trim_end());
-            }
-            match &state.kind {
-                StatePlanKind::Switch(cases) => {
-                    let _ = writeln!(
-                        out,
-                        "        {} => {{\n            let node = eng.node();\n            match node.kind_id() {{",
-                        self.state(state.id).const_name
-                    );
-                    for action in cases {
-                        let _ = writeln!(
-                            out,
-                            "                {} => 'state: {{",
-                            u16::from(action.kind)
-                        );
-                        for effects in &action.prefix {
-                            for effect in effects {
-                                self.effect_stmt(out, effect, "                    ");
-                            }
-                        }
-                        let plan = &action.action;
-                        self.render_checks(
-                            out,
-                            self.candidate_checks(&plan.checks),
-                            "                    ",
-                            "break 'state Flow::Backtrack;",
-                        );
-                        self.effects_and_flow(
-                            out,
-                            &plan.effects,
-                            &plan.flow,
-                            "                    ",
-                        );
-                        let _ = writeln!(out, "                }} // {}", action.pattern);
-                    }
-                    out.push_str(
-                        "                _ => Flow::Backtrack,\n            }\n        }\n",
-                    );
-                }
-                StatePlanKind::Epsilon { effects, flow } => {
-                    self.epsilon_arm(out, state, effects, flow);
-                }
-                StatePlanKind::Match(plan) => self.match_arm(out, state, plan),
-                StatePlanKind::Call(plan) => self.call_arm(out, state, plan),
-                StatePlanKind::Return(port) => {
-                    let port = port.to_byte();
-                    let top_level = if port == 0 {
-                        "Flow::Accept".to_owned()
-                    } else {
-                        format!("panic!(\"entrypoint returned through nonzero port {port}\")")
-                    };
-                    let port = port.to_string();
-                    let template = if self.has_calls {
-                        RETURN_ARM
-                    } else {
-                        RETURN_ARM_NO_CALLS
-                    };
-                    splice(
-                        out,
-                        "        ",
-                        template,
-                        &[
-                            ("STATE", &self.state(state.id).const_name),
-                            ("PORT", &port),
-                            ("TOP_LEVEL", &top_level),
-                        ],
-                    );
-                }
-            }
-        }
-        out.push_str(DISPATCH_CLOSE);
-    }
-
-    fn epsilon_arm(
-        &self,
-        out: &mut String,
-        state: &StatePlan,
-        effects: &[EffectPlan],
-        flow: &FlowPlan,
-    ) {
-        let info = self.state(state.id);
-        if effects.is_empty()
-            && let FlowPlan::Jump(next) = flow
-        {
-            let _ = writeln!(
-                out,
-                "        {} => Flow::Jump({}),",
-                info.const_name,
-                self.state(*next).const_name
-            );
-            return;
-        }
-
-        let _ = writeln!(out, "        {} => {{", info.const_name);
-        self.effects_and_flow(out, effects, flow, "            ");
-        out.push_str("        }\n");
-    }
-
-    fn match_arm(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
-        let info = self.state(state.id);
-
-        if plan.can_fail_before_flow() {
-            let _ = writeln!(out, "        {} => 'state: {{", info.const_name);
-        } else {
-            let _ = writeln!(out, "        {} => {{", info.const_name);
-        }
-
-        if plan.navigates() {
-            self.navigate_or_backtrack(out, plan.nav);
-        }
-
-        self.candidate_search(out, state, plan, CandidateFailure::StateBacktrack);
-        self.retry_checkpoint(out, state, plan, "            ");
-
-        if plan.retry.is_some() {
-            let _ = writeln!(out, "            finish_{}(eng)", info.fn_stem);
-        } else {
-            self.effects_and_flow(out, &plan.action.effects, &plan.action.flow, "            ");
-        }
-        out.push_str("        }\n");
-    }
-
-    fn candidate_search(
-        &self,
-        out: &mut String,
-        state: &StatePlan,
-        plan: &MatchPlan,
-        failure: CandidateFailure,
-    ) {
+    fn candidate_search(&self, out: &mut String, plan: &MatchPlan) {
         if !plan.has_candidate_checks() {
             return;
         }
-        let call = self.cand_call(state, plan);
-        let fail = failure.code();
-        let indent = "            ";
+        let mut failures = Vec::new();
+        if let Some(kind) = &plan.kind {
+            failures.push(format!("node.kind_id() != {}", kind.id));
+        }
+        failures.extend(
+            plan.action
+                .checks
+                .iter()
+                .map(|check| self.check_failure(check)),
+        );
+        let failure = failures.join(" || ");
         if plan.search == SkipPolicy::Exact {
-            splice(
+            if plan.needs_node_binding() {
+                out.push_str("                let node = eng.node();\n");
+            }
+            let _ = writeln!(
                 out,
-                indent,
-                CANDIDATE_ONCE,
-                &[("CAND", &call), ("FAIL", fail)],
+                "                if {failure} {{ return Flow::Backtrack; }}"
             );
             return;
         }
-        splice(
+        out.push_str("                loop {\n");
+        if plan.needs_node_binding() {
+            out.push_str("                    let node = eng.node();\n");
+        }
+        let _ = writeln!(out, "                    if !({failure}) {{ break; }}");
+        let _ = writeln!(
             out,
-            indent,
-            CANDIDATE_LOOP,
-            &[
-                ("CAND", &call),
-                ("POLICY", &policy_expr(plan.search)),
-                ("FAIL", fail),
-            ],
+            "                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::{:?}) {{ return Flow::Backtrack; }}",
+            plan.search
         );
+        out.push_str("                }\n");
     }
 
-    fn retry_checkpoint(
-        &self,
-        out: &mut String,
-        state: &StatePlan,
-        plan: &MatchPlan,
-        indent: &str,
-    ) {
-        let Some(policy) = plan.retry else {
+    fn call_field(&self, out: &mut String, plan: &CallPlan) {
+        let Some(field) = plan.field else {
             return;
         };
-        let policy = policy_expr(policy);
-        let state = &self.state(state.id).const_name;
-        let compact_len = format!(
-            "{indent}    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), {state}));"
-        )
-        .len()
-            + 4;
-        let template = if compact_len <= 100 {
-            RETRY_CHECKPOINT_COMPACT
-        } else {
-            RETRY_CHECKPOINT_EXPANDED
-        };
-        splice(
+        let field = self.field_const(field);
+        if plan.stays_on_current_node() {
+            let _ = writeln!(
+                out,
+                "                if eng.cursor().field_id() != Some({field}) {{ return Flow::Backtrack; }}"
+            );
+            return;
+        }
+        let _ = writeln!(
             out,
-            indent,
-            template,
-            &[("POLICY", &policy), ("STATE", state)],
+            "                while eng.cursor().field_id() != Some({field}) {{"
         );
+        let _ = writeln!(
+            out,
+            "                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::{:?}) {{ return Flow::Backtrack; }}",
+            plan.search
+        );
+        out.push_str("                }\n");
     }
 
-    fn navigate_or_backtrack(&self, out: &mut String, nav: Nav) {
-        let nav = nav_expr(nav);
-        let chain = format!("eng.cursor_mut().navigate({nav}).is_none()");
-        let template = if chain.len() <= 60 {
-            NAVIGATE_OR_BACKTRACK
-        } else {
-            NAVIGATE_OR_BACKTRACK_EXPANDED
+    fn retry_checkpoint(&self, out: &mut String, state: &StatePlan) {
+        let policy = match &state.kind {
+            StatePlanKind::Match(plan) => plan.retry,
+            StatePlanKind::Call(plan) => plan.retry,
+            _ => unreachable!("only matches and calls have retry checkpoints"),
         };
-        splice(out, "            ", template, &[("NAV", &nav)]);
+        let Some(policy) = policy else {
+            return;
+        };
+        let block = self.plan.matcher().retry_block(state.id);
+        let push = format!(
+            "eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), {block}u32));"
+        );
+        if matches!(state.kind, StatePlanKind::Match(_)) {
+            let _ = writeln!(
+                out,
+                "                if rt::SkipPolicy::{policy:?}.admits(|| eng.node()) {{\n                    {push}\n                }}"
+            );
+            return;
+        }
+
+        let _ = writeln!(out, "                {push}");
     }
 
-    fn cand_call(&self, state: &StatePlan, plan: &MatchPlan) -> String {
-        let stem = &self.state(state.id).fn_stem;
-        if plan.has_predicate() {
-            format!("cand_{stem}(eng, source)")
-        } else {
-            format!("cand_{stem}(eng)")
+    fn retry(&self, out: &mut String, state: &StatePlan) {
+        let policy = match &state.kind {
+            StatePlanKind::Match(plan) => plan
+                .retry
+                .expect("retry block belongs to a retryable match"),
+            StatePlanKind::Call(plan) => {
+                plan.retry.expect("retry block belongs to a retryable call")
+            }
+            _ => unreachable!("only matches and calls have retry blocks"),
+        };
+        let _ = writeln!(
+            out,
+            "                if !eng.cursor_mut().continue_search(rt::SkipPolicy::{policy:?}) {{ return Flow::Backtrack; }}"
+        );
+        match &state.kind {
+            StatePlanKind::Match(plan) => {
+                self.candidate_search(out, plan);
+                self.retry_checkpoint(out, state);
+                self.effects_and_flow(
+                    out,
+                    &plan.action.effects,
+                    &plan.action.flow,
+                    None,
+                    "                ",
+                );
+            }
+            StatePlanKind::Call(plan) => {
+                self.call_field(out, plan);
+                self.retry_checkpoint(out, state);
+                let _ = writeln!(out, "                Flow::Call(&CALL_{})", state.id.raw());
+            }
+            _ => unreachable!("only matches and calls have retry blocks"),
         }
     }
 
@@ -702,866 +670,134 @@ impl<'a> Generator<'a> {
         out: &mut String,
         effects: &[EffectPlan],
         flow: &FlowPlan,
+        next: Option<StateId>,
         indent: &str,
     ) {
         for effect in effects {
             self.effect_stmt(out, effect, indent);
         }
+        if let Some(next) = next {
+            assert!(
+                matches!(flow, FlowPlan::Jump(target) if *target == next),
+                "fused block falls through to its only successor"
+            );
+            return;
+        }
         match flow {
             FlowPlan::Accept => {
                 let _ = writeln!(out, "{indent}Flow::Accept");
             }
-            FlowPlan::Jump(next) => {
-                let _ = writeln!(out, "{indent}Flow::Jump({})", self.state(*next).const_name);
-            }
+            FlowPlan::Jump(next) => self.jump(out, *next, indent),
             FlowPlan::Fork { next, successors } => {
-                let successor_names = successors
+                let successors = successors
                     .iter()
-                    .map(|successor| self.state(*successor).const_name.as_str())
+                    .map(|&target| format!("{}u32", self.plan.matcher().block(target)))
                     .collect::<Vec<_>>()
                     .join(", ");
-                let _ = writeln!(out, "{indent}eng.push_successors(&[{successor_names}]);");
-                let _ = writeln!(out, "{indent}Flow::Jump({})", self.state(*next).const_name);
+                let _ = writeln!(out, "{indent}eng.push_successors(&[{successors}]);");
+                self.jump(out, *next, indent);
+            }
+        }
+    }
+
+    fn jump(&self, out: &mut String, target: StateId, indent: &str) {
+        let _ = writeln!(
+            out,
+            "{indent}block = {};\n{indent}continue 'run;",
+            self.plan.matcher().block(target)
+        );
+    }
+
+    fn check_failure(&self, check: &CheckPlan) -> String {
+        match check {
+            CheckPlan::Class(KindClass::Named) => "!node.is_named()".to_owned(),
+            CheckPlan::Class(KindClass::Anonymous) => "node.is_named()".to_owned(),
+            CheckPlan::Missing => "!node.is_missing()".to_owned(),
+            CheckPlan::Field(field) => format!(
+                "eng.cursor().field_id() != Some({})",
+                self.field_const(field.id)
+            ),
+            CheckPlan::NegField(field) => format!(
+                "node.child_by_field_id(u16::from({})).is_some()",
+                self.field_const(field.id)
+            ),
+            CheckPlan::Predicate(predicate) => self.predicate_failure(predicate),
+        }
+    }
+
+    fn predicate_failure(&self, predicate: &PredicatePlan) -> String {
+        let text = "rt::node_text(source, &node)";
+        match &predicate.value {
+            PredicateValuePlan::String(value) => {
+                let value = rust_string(value);
+                match predicate.op {
+                    PredicateOp::Eq => format!("{text} != {value}"),
+                    PredicateOp::Ne => format!("{text} == {value}"),
+                    PredicateOp::StartsWith => format!("!{text}.starts_with({value})"),
+                    PredicateOp::EndsWith => format!("!{text}.ends_with({value})"),
+                    PredicateOp::Contains => format!("!{text}.contains({value})"),
+                    _ => unreachable!("string predicate has a string operator"),
+                }
+            }
+            PredicateValuePlan::Regex { id, .. } => {
+                let regex = format!("RE_{}", id.index());
+                match predicate.op {
+                    PredicateOp::RegexMatch => format!("!{regex}.is_match({text})"),
+                    PredicateOp::RegexNoMatch => format!("{regex}.is_match({text})"),
+                    _ => unreachable!("regex predicate has a regex operator"),
+                }
             }
         }
     }
 
     fn effect_stmt(&self, out: &mut String, effect: &EffectPlan, indent: &str) {
-        let unit = |out: &mut String, variant: &str| {
-            let _ = writeln!(
-                out,
-                "{indent}eng.emit_output_event(|_| rt::JournalEvent::{variant});"
-            );
-        };
-        match effect.kind {
-            EffectKind::Node => {
-                let _ = writeln!(
-                    out,
-                    "{indent}eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));"
-                );
-            }
-            EffectKind::ListOpen => unit(out, "ListOpen"),
-            EffectKind::ArrayPush => unit(out, "ArrayPush"),
-            EffectKind::ListClose => unit(out, "ListClose"),
-            EffectKind::RecordOpen => unit(out, "RecordOpen"),
-            EffectKind::RecordClose => unit(out, "RecordClose"),
-            EffectKind::VariantClose => unit(out, "VariantClose"),
-            EffectKind::Absent => unit(out, "Absent"),
-            EffectKind::RecordSet | EffectKind::VariantOpen => {
-                let variant = if effect.kind == EffectKind::RecordSet {
-                    "RecordSet"
-                } else {
-                    "VariantOpen"
-                };
-                let _ = writeln!(
-                    out,
-                    "{indent}eng.emit_output_event(|_| rt::JournalEvent::{variant}({})); // {}",
-                    effect.payload, effect.display
-                );
-            }
-            EffectKind::SuppressBegin => {
-                let _ = writeln!(out, "{indent}eng.suppress_begin();");
-            }
-            EffectKind::SuppressEnd => {
-                let _ = writeln!(out, "{indent}eng.suppress_end();");
-            }
-            EffectKind::ScalarOpen => {
-                let _ = writeln!(out, "{indent}eng.scalar_open();");
-            }
-            EffectKind::ScalarMark => {
-                let _ = writeln!(out, "{indent}eng.scalar_mark();");
-            }
-            EffectKind::TextClose => {
-                let _ = writeln!(out, "{indent}eng.scalar_close_text();");
-            }
-            EffectKind::BoolClose => {
-                let value = effect.payload != 0;
-                let _ = writeln!(out, "{indent}eng.scalar_close_bool({value});");
-            }
-            EffectKind::NodeText => {
-                let _ = writeln!(out, "{indent}eng.node_text();");
-            }
-            EffectKind::NodeBool => {
-                let _ = writeln!(out, "{indent}eng.node_bool();");
-            }
-            EffectKind::BoolValue => {
-                let value = effect.payload != 0;
-                let _ = writeln!(out, "{indent}eng.bool_value({value});");
-            }
-            EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd => {
-                unreachable!("inspection spans rejected before generation")
-            }
-        }
-    }
-
-    fn call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
-        if plan.caller_owned() {
-            self.caller_owned_call_arm(out, state_plan, plan);
-        } else {
-            self.callee_owned_call_arm(out, state_plan, plan);
-        }
-    }
-
-    fn caller_owned_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
-        let state = &self.state(state_plan.id).const_name;
-        let target = &self.state(plan.target).const_name;
-        let stays_on_current_node = plan.stays_on_current_node();
-
-        if plan.can_fail_before_flow() {
-            let _ = writeln!(out, "        {state} => 'state: {{");
-        } else {
-            let _ = writeln!(out, "        {state} => {{");
-        }
-
-        if stays_on_current_node {
-            if let Some(field) = plan.field {
-                splice(
-                    out,
-                    "            ",
-                    CALL_FIELD_CHECK,
-                    &[("FIELD", &self.field_const(field))],
-                );
-            }
-        } else {
-            self.navigate_or_backtrack(out, plan.nav);
-            if let Some(field) = plan.field {
-                splice(
-                    out,
-                    "            ",
-                    CALL_FIELD_SCAN,
-                    &[
-                        ("FIELD", &self.field_const(field)),
-                        ("POLICY", &policy_expr(plan.search)),
-                    ],
-                );
-            }
-        }
-
-        if let Some(policy) = plan.retry {
-            let field = match plan.field {
-                Some(field) => format!("Some({})", self.field_const(field)),
-                None => "None".to_string(),
-            };
-            splice(
-                out,
-                "            ",
-                CALL_RETRY_PUSH,
-                &[
-                    ("STATE", state),
-                    ("TARGET", target),
-                    ("CALL_SITE", state),
-                    ("FIELD", &field),
-                    ("POLICY", &policy_expr(policy)),
-                ],
-            );
-        }
-
-        let _ = writeln!(
-            out,
-            "            if let Err(error) = eng.enter_frame({state}) {{"
-        );
-        out.push_str("                return Flow::CallFrameError(error);\n");
-        out.push_str("            }\n");
-        let _ = writeln!(out, "            Flow::Jump({target})");
-        out.push_str("        }\n");
-    }
-
-    fn callee_owned_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
-        let state = &self.state(state_plan.id).const_name;
-        let target = &self.state(plan.target).const_name;
-        let _ = writeln!(out, "        {state} => {{");
-        let _ = writeln!(
-            out,
-            "            if let Err(error) = eng.enter_frame({state}) {{"
-        );
-        out.push_str("                return Flow::CallFrameError(error);\n");
-        out.push_str("            }\n");
-        let _ = writeln!(out, "            Flow::Jump({target})");
-        out.push_str("        }\n");
-    }
-
-    fn cand_fns(&self, out: &mut String) {
-        for state in self.plan.matcher().states() {
-            let StatePlanKind::Match(plan) = &state.kind else {
-                continue;
-            };
-            if !plan.has_candidate_checks() {
-                continue;
-            }
-            self.cand_fn(out, state, plan);
-        }
-    }
-
-    fn cand_fn(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
-        let info = self.state(state.id);
-        out.push('\n');
-        let _ = writeln!(
-            out,
-            "/// `{}` candidate: `{}`.",
-            info.const_name, plan.candidate_pattern
-        );
-        out.push_str("#[inline]\n");
-        let source_param = if plan.has_predicate() {
-            ", source: &str"
-        } else {
-            ""
-        };
-        let _ = writeln!(
-            out,
-            "fn cand_{}(eng: &rt::Engine<'_>{source_param}) -> bool {{",
-            info.fn_stem
-        );
-        if plan.needs_node_binding() {
-            out.push_str("    let node = eng.node();\n");
-        }
-        let kind = plan
-            .kind
-            .iter()
-            .map(|kind| CandidateCheck::new(&kind.name, format!("node.kind_id() != {}", kind.id)));
-        let checks = kind.chain(self.candidate_checks(&plan.action.checks));
-        self.render_checks(out, checks, "    ", "return false;");
-        out.push_str("    true\n}\n");
-    }
-
-    fn render_checks(
-        &self,
-        out: &mut String,
-        checks: impl IntoIterator<Item = CandidateCheck>,
-        indent: &str,
-        failure: &str,
-    ) {
-        for check in checks {
-            splice(
-                out,
-                indent,
-                CHECK,
-                &[
-                    ("COMMENT", &check.comment),
-                    ("FAIL", &check.fail),
-                    ("FAILURE", failure),
-                ],
-            );
-        }
-    }
-
-    fn candidate_checks(&self, plans: &[CheckPlan]) -> Vec<CandidateCheck> {
-        plans
-            .iter()
-            .map(|plan| match plan {
-                CheckPlan::Class(KindClass::Named) => {
-                    CandidateCheck::new("(_)", "!node.is_named()")
-                }
-                CheckPlan::Class(KindClass::Anonymous) => {
-                    CandidateCheck::new("\"_\"", "node.is_named()")
-                }
-                CheckPlan::Missing => CandidateCheck::new(
-                    "(MISSING …): only nodes the parser inserted during error recovery",
-                    "!node.is_missing()",
-                ),
-                CheckPlan::Field(field) => CandidateCheck::new(
-                    format!("{}:", field.name),
-                    format!(
-                        "eng.cursor().field_id() != Some({})",
-                        self.field_const(field.id)
-                    ),
-                ),
-                CheckPlan::NegField(field) => CandidateCheck::new(
-                    format!("-{}", field.name),
-                    format!(
-                        "node.child_by_field_id(u16::from({})).is_some()",
-                        self.field_const(field.id)
-                    ),
-                ),
-                CheckPlan::Predicate(predicate) => self.predicate_check(predicate),
-            })
-            .collect()
-    }
-
-    fn predicate_check(&self, predicate: &PredicatePlan) -> CandidateCheck {
-        let text = "rt::node_text(source, &node)";
-        match &predicate.value {
-            PredicateValuePlan::String(value) => {
-                let lit = rust_string(value);
-                let fail = match predicate.op {
-                    PredicateOp::Eq => format!("{text} != {lit}"),
-                    PredicateOp::Ne => format!("{text} == {lit}"),
-                    PredicateOp::StartsWith => format!("!{text}.starts_with({lit})"),
-                    PredicateOp::EndsWith => format!("!{text}.ends_with({lit})"),
-                    PredicateOp::Contains => format!("!{text}.contains({lit})"),
-                    PredicateOp::RegexMatch | PredicateOp::RegexNoMatch => {
-                        unreachable!("regex predicate carries a regex value")
+        let event = match effect.kind {
+            EffectKind::Node => "Node(c.node())".to_owned(),
+            EffectKind::ListOpen => "ListOpen".to_owned(),
+            EffectKind::ArrayPush => "ArrayPush".to_owned(),
+            EffectKind::ListClose => "ListClose".to_owned(),
+            EffectKind::RecordOpen => "RecordOpen".to_owned(),
+            EffectKind::RecordClose => "RecordClose".to_owned(),
+            EffectKind::VariantClose => "VariantClose".to_owned(),
+            EffectKind::Absent => "Absent".to_owned(),
+            EffectKind::RecordSet => format!("RecordSet({})", effect.payload),
+            EffectKind::VariantOpen => format!("VariantOpen({})", effect.payload),
+            kind => {
+                let call = match kind {
+                    EffectKind::SuppressBegin => "suppress_begin()".to_owned(),
+                    EffectKind::SuppressEnd => "suppress_end()".to_owned(),
+                    EffectKind::ScalarOpen => "scalar_open()".to_owned(),
+                    EffectKind::ScalarMark => "scalar_mark()".to_owned(),
+                    EffectKind::TextClose => "scalar_close_text()".to_owned(),
+                    EffectKind::BoolClose => format!("scalar_close_bool({})", effect.payload != 0),
+                    EffectKind::NodeText => "node_text()".to_owned(),
+                    EffectKind::NodeBool => "node_bool()".to_owned(),
+                    EffectKind::BoolValue => format!("bool_value({})", effect.payload != 0),
+                    EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd => {
+                        unreachable!("inspection spans rejected before generation")
                     }
+                    _ => unreachable!("event effects are emitted directly"),
                 };
-                CandidateCheck::new(format!("{} {lit}", predicate.op.as_str()), fail)
+                let _ = writeln!(out, "{indent}eng.{call};");
+                return;
             }
-            PredicateValuePlan::Regex { id, pattern } => {
-                let re = self.regex_static(*id);
-                let fail = match predicate.op {
-                    PredicateOp::RegexMatch => format!("!{re}.is_match({text})"),
-                    PredicateOp::RegexNoMatch => format!("{re}.is_match({text})"),
-                    _ => unreachable!("string predicate carries a string value"),
-                };
-                CandidateCheck::new(format!("{} /{pattern}/", predicate.op.as_str()), fail)
-            }
-        }
-    }
-
-    fn finish_fns(&self, out: &mut String) {
-        for state in self.plan.matcher().states() {
-            let StatePlanKind::Match(plan) = &state.kind else {
-                continue;
-            };
-            if plan.retry.is_none() {
-                continue;
-            }
-            let info = self.state(state.id);
-            let eng = if plan.action.effects.is_empty()
-                && !matches!(plan.action.flow, FlowPlan::Fork { .. })
-            {
-                "_eng"
-            } else {
-                "eng"
-            };
-            out.push('\n');
-            splice(
-                out,
-                "",
-                FINISH_FN_OPEN,
-                &[
-                    ("STATE", &info.const_name),
-                    ("STEM", &info.fn_stem),
-                    ("ENG", eng),
-                ],
-            );
-            self.effects_and_flow(out, &plan.action.effects, &plan.action.flow, "    ");
-            out.push_str("}\n");
-        }
-    }
-
-    fn backtrack_fn(&self, out: &mut String) {
-        let source_arg = if self.plan.matcher().any_retry_predicate() {
-            "source"
-        } else {
-            "_source"
         };
-        let (call_resume, match_retry_call_error) = if self.has_calls {
-            (BACKTRACK_CALL_RESUME, MATCH_RETRY_CALL_ERROR)
+        let cursor = if effect.kind == EffectKind::Node {
+            "c"
         } else {
-            (BACKTRACK_CALL_RESUME_UNREACHABLE, "")
+            "_"
         };
-        out.push('\n');
-        splice(
+        let _ = writeln!(
             out,
-            "",
-            BACKTRACK_SKELETON,
-            &[
-                ("SOURCE", source_arg),
-                ("CALL_RESUME", call_resume),
-                ("MATCH_RETRY_CALL_ERROR", match_retry_call_error),
-            ],
+            "{indent}eng.emit_output_event(|{cursor}| rt::JournalEvent::{event});"
         );
     }
-
-    fn match_retry_fn(&self, out: &mut String) {
-        let retryable: Vec<(&StatePlan, &MatchPlan)> = self
-            .plan
-            .matcher()
-            .states()
-            .iter()
-            .filter_map(|state| match &state.kind {
-                StatePlanKind::Match(plan) if plan.retry.is_some() => Some((state, plan)),
-                _ => None,
-            })
-            .collect();
-
-        let source_param = if self.plan.matcher().any_retry_predicate() {
-            "source"
-        } else {
-            "_source"
-        };
-        out.push('\n');
-        if retryable.is_empty() {
-            splice(out, "", MATCH_RETRY_EMPTY, &[("SOURCE", source_param)]);
-            return;
-        }
-        splice(
-            out,
-            "",
-            MATCH_RETRY_OPEN,
-            &[("ENG", "eng"), ("SOURCE", source_param)],
-        );
-        for (state, plan) in retryable {
-            let info = self.state(state.id);
-            let policy = plan
-                .retry
-                .expect("retryable match carries its exact skip policy");
-            let _ = writeln!(out, "        {} => {{", info.const_name);
-            splice(
-                out,
-                "            ",
-                RETRY_ADVANCE,
-                &[("POLICY", &policy_expr(policy))],
-            );
-            self.candidate_search(out, state, plan, CandidateFailure::RetryExhausted);
-            self.retry_checkpoint(out, state, plan, "            ");
-            let _ = writeln!(out, "            Some(finish_{}(eng))", info.fn_stem);
-            out.push_str("        }\n");
-        }
-        out.push_str(MATCH_RETRY_CLOSE);
-    }
-}
-
-pub(super) fn nav_expr(nav: Nav) -> String {
-    format!("rt::Nav::{nav:?}")
-}
-
-fn policy_expr(policy: SkipPolicy) -> String {
-    format!("rt::SkipPolicy::{policy:?}")
-}
-
-fn render_const_slice(
-    out: &mut String,
-    declaration: &str,
-    entries: impl Iterator<Item = String>,
-    inline_entry_limit: usize,
-) {
-    let entries = entries.collect::<Vec<_>>();
-    if entries.is_empty() {
-        let _ = writeln!(out, "{declaration} = &[];");
-        return;
-    }
-
-    let joined = entries.join(", ");
-    let compact = format!("{declaration} = &[{joined}];");
-    if compact.len() + 4 <= 100 {
-        let _ = writeln!(out, "{compact}");
-        return;
-    }
-    if entries.len() <= inline_entry_limit && joined.len() + 12 <= 100 {
-        let _ = writeln!(out, "{declaration} =");
-        let _ = writeln!(out, "    &[{joined}];");
-        return;
-    }
-
-    let _ = writeln!(out, "{declaration} = &[");
-    for entry in entries {
-        let _ = writeln!(out, "    {entry},");
-    }
-    out.push_str("];\n");
 }
 
 pub(super) fn depth_expr(limit: Limit, max_decoder_frame_bytes: u64) -> String {
     match limit {
         Limit::Auto => format!("Some(rt::decode_depth_auto({max_decoder_frame_bytes}))"),
         Limit::Of(n) => format!("Some({n})"),
-        Limit::Unbounded => "None".to_string(),
+        Limit::Unbounded => "None".to_owned(),
     }
 }
-
-const HEADER: &str = r#"
-// Generated Plotnik query module: typed result types, supplied-node execution
-// points, per-type result decoders, and the compiled matcher (`mod matcher`).
-// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
-// dispatch arm carries its instruction in the dump format.
-
-use @RT@ as rt;
-
-pub const REQUIRED_RUNTIME_ABI: u32 = @ABI@;
-const _: () = assert!(
-    rt::RUNTIME_ABI == REQUIRED_RUNTIME_ABI,
-    "Plotnik runtime ABI mismatch"
-);
-"#;
-
-const MOD_HEADER: &str = r#"
-use @RT@ as rt;
-"#;
-
-const DECODE_DEPTH_CONST: &str = r#"
-/// Ceiling on recursive typed decoding (`None` opts out). The
-/// matcher itself is iterative; only decoder recursion enters this guard.
-pub(super) const MAX_DECODE_DEPTH: Option<u64> = @DEPTH@;
-"#;
-
-const VERIFY_LANGUAGE: &str = r#"
-/// A parser built from any other grammar version could renumber the baked
-/// kind/field ids and silently mis-match, so mismatches panic: version skew
-/// between the generation-time grammar and the runtime parser is a build
-/// mistake, not a runtime condition to recover from.
-pub(super) fn verify_language(node: rt::Node<'_>) {
-    let language = node.language();
-    for &(id, name, named) in EXPECTED_KINDS {
-        let found = language.node_kind_for_id(id);
-        if found != Some(name) || language.node_kind_is_named(id) != named {
-            panic!(
-                "grammar version skew: this query module was generated against a \
-                 grammar where node kind {id} is {name:?}, but the tree's language \
-                 says {found:?} — rebuild the module with the grammar of the parser \
-                 that produced the tree",
-            );
-        }
-    }
-    for &(id, name) in EXPECTED_FIELDS {
-        let found = language.field_name_for_id(id);
-        if found != Some(name) {
-            panic!(
-                "grammar version skew: this query module was generated against a \
-                 grammar where field {id} is {name:?}, but the tree's language \
-                 says {found:?} — rebuild the module with the grammar of the parser \
-                 that produced the tree",
-            );
-        }
-    }
-}
-"#;
-
-const VERIFY_LANGUAGE_WITH_IDENTITY: &str = r#"
-/// A parser built from any other grammar version could renumber the baked
-/// kind/field ids and silently mis-match, so mismatches panic: version skew
-/// between the generation-time grammar and the runtime parser is a build
-/// mistake, not a runtime condition to recover from.
-pub(super) fn verify_language(node: rt::Node<'_>) {
-    let language = node.language();
-    for &(id, name, named) in EXPECTED_KINDS {
-        let found = language.node_kind_for_id(id);
-        if found != Some(name) || language.node_kind_is_named(id) != named {
-            panic!(
-                "grammar version skew: this query module was generated against {} \
-                 ({}, grammar.json SHA-256 {}) where node kind {id} is {name:?}, \
-                 but the tree's language says {found:?} — regenerate against the \
-                 grammar.json belonging to the parser that produced the tree",
-                GRAMMAR_NAME, GRAMMAR_SOURCE, GRAMMAR_SHA256,
-            );
-        }
-    }
-    for &(id, name) in EXPECTED_FIELDS {
-        let found = language.field_name_for_id(id);
-        if found != Some(name) {
-            panic!(
-                "grammar version skew: this query module was generated against {} \
-                 ({}, grammar.json SHA-256 {}) where field {id} is {name:?}, but \
-                 the tree's language says {found:?} — regenerate against the \
-                 grammar.json belonging to the parser that produced the tree",
-                GRAMMAR_NAME, GRAMMAR_SOURCE, GRAMMAR_SHA256,
-            );
-        }
-    }
-}
-"#;
-
-const JOURNAL_ENTRY_FN: &str = r#"
-/// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
-/// match journal — the same event sequence the VM commits for this query.
-pub fn @JOURNAL_FN@<'t>(
-    tree: &'t rt::Tree,
-    source: &str,
-) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    let entry = @ENTRY@;
-    let boundary = @BOUNDARY@;
-    run(tree, source, entry, boundary)
-}
-"#;
-
-const APPLY_ENTRY_FN: &str = r#"
-/// Apply one candidate at the engine's current node.
-pub(super) fn @APPLY_FN@<'a, 't>(
-    eng: &'a mut rt::Engine<'t>,
-    source: &str,
-) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-@APPLY_CALL@
-}
-"#;
-
-const DRIVER_SKELETON: &str = r#"
-#[derive(Clone, Copy)]
-struct EntryBoundary {
-    record: bool,
-    node: bool,
-}
-
-impl EntryBoundary {
-    const fn new(record: bool, node: bool) -> Self {
-        Self { record, node }
-    }
-
-    fn begin(self, eng: &mut rt::Engine<'_>) {
-        if self.record {
-            let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
-        }
-    }
-
-    fn finish(self, eng: &mut rt::Engine<'_>) {
-        if self.node {
-            let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
-            return;
-        }
-        if self.record {
-            let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
-        }
-    }
-}
-
-/// What a dispatched state hands back to the driver loop.
-enum Flow {
-    /// Continue at this state.
-    Jump(u16),
-    /// The entrypoint accepted; the match journal is committed.
-    Accept,
-    /// The state failed; unwind the checkpoint stack.
-    Backtrack,@FLOW_CALL_ERROR_VARIANT@
-}
-
-/// How the backtrack unwind resumed execution.
-enum Unwound {
-    Resumed(u16),
-    Accepted,
-    NoMatch,@UNWOUND_CALL_ERROR_VARIANT@
-}
-
-/// One dispatch loop serves every entrypoint; `entry` selects the definition
-/// body and `boundary` supplies its root result effects.
-fn run<'t>(
-    tree: &'t rt::Tree,
-    source: &str,
-    entry: u16,
-    boundary: EntryBoundary,
-) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    let mut eng = rt::Engine::new(tree.root_node().walk());
-    verify_language(eng.node());
-    let accepted = run_at_node(&mut eng, source, entry, boundary)?.is_some();
-    Ok(accepted.then(|| eng.into_journal()))
-}
-
-fn run_at_node<'a, 't>(
-    eng: &'a mut rt::Engine<'t>,
-    source: &str,
-    entry: u16,
-    boundary: EntryBoundary,
-) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-    boundary.begin(eng);
-    let mut ip = entry;
-    loop {
-        match dispatch(eng, source, ip) {
-            Flow::Jump(next) => ip = next,
-            Flow::Accept => {
-                boundary.finish(eng);
-                return Ok(Some(eng.accepted_journal()));
-            }@FLOW_CALL_ERROR_ARM@
-            Flow::Backtrack => match backtrack(eng, source) {
-                Unwound::Resumed(next) => ip = next,
-                Unwound::Accepted => {
-                    boundary.finish(eng);
-                    return Ok(Some(eng.accepted_journal()));
-                }
-                Unwound::NoMatch => return Ok(None),@UNWOUND_CALL_ERROR_ARM@
-            },
-        }
-    }
-}
-"#;
-
-const DISPATCH_OPEN: &str = r#"
-#[inline]
-fn dispatch<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Flow {
-    match ip {
-"#;
-
-const DISPATCH_CLOSE: &str = "        _ => unreachable!(\"ip {ip} is not a generated state\"),
-    }
-}
-";
-
-const NAVIGATE_OR_BACKTRACK: &str = r#"
-if eng.cursor_mut().navigate(@NAV@).is_none() {
-    break 'state Flow::Backtrack;
-}
-"#;
-
-const NAVIGATE_OR_BACKTRACK_EXPANDED: &str = r#"
-if eng
-    .cursor_mut()
-    .navigate(@NAV@)
-    .is_none()
-{
-    break 'state Flow::Backtrack;
-}
-"#;
-
-const CANDIDATE_ONCE: &str = r#"
-if !@CAND@ {
-    @FAIL@
-}
-"#;
-
-const CANDIDATE_LOOP: &str = r#"
-loop {
-    if @CAND@ {
-        break;
-    }
-    if !eng.cursor_mut().continue_search(@POLICY@) {
-        @FAIL@
-    }
-}
-"#;
-
-const RETRY_CHECKPOINT_COMPACT: &str = r#"
-if @POLICY@.admits(&eng.node()) {
-    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), @STATE@));
-}
-"#;
-
-const RETRY_CHECKPOINT_EXPANDED: &str = r#"
-if @POLICY@.admits(&eng.node()) {
-    eng.push_checkpoint(rt::Checkpoint::match_retry(
-        eng.checkpoint_state(),
-        @STATE@,
-    ));
-}
-"#;
-
-const CHECK: &str = r#"
-// @COMMENT@
-if @FAIL@ {
-    @FAILURE@
-}
-"#;
-
-const CALL_FIELD_CHECK: &str = r#"
-if eng.cursor().field_id() != Some(@FIELD@) {
-    break 'state Flow::Backtrack;
-}
-"#;
-
-const CALL_FIELD_SCAN: &str = r#"
-loop {
-    if eng.cursor().field_id() == Some(@FIELD@) {
-        break;
-    }
-    if !eng.cursor_mut().continue_search(@POLICY@) {
-        break 'state Flow::Backtrack;
-    }
-}
-"#;
-
-const CALL_RETRY_PUSH: &str = r#"
-eng.push_checkpoint(rt::Checkpoint::call_retry(
-    eng.checkpoint_state(),
-    @STATE@,
-    rt::CallResume {
-        target: @TARGET@,
-        call_site: @CALL_SITE@,
-        field: @FIELD@,
-        policy: @POLICY@,
-    },
-));
-"#;
-
-const RETURN_ARM: &str = r#"
-@STATE@ => {
-    if eng.frames_empty() {
-        @TOP_LEVEL@
-    } else {
-        let call_site = eng.exit_frame();
-        Flow::Jump(call_return(call_site, rt::PortId::from_raw(@PORT@)))
-    }
-}
-"#;
-
-const RETURN_ARM_NO_CALLS: &str = r#"
-@STATE@ => @TOP_LEVEL@,
-"#;
-
-const FINISH_FN_OPEN: &str = r#"
-/// `@STATE@` post-acceptance: effects, then successor dispatch. Shared by the dispatch
-/// path and the match-retry resume, so a retried candidate emits exactly
-/// what the original acceptance would have emitted.
-#[inline]
-fn finish_@STEM@(@ENG@: &mut rt::Engine<'_>) -> Flow {
-"#;
-
-const BACKTRACK_SKELETON: &str = r#"
-/// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
-/// Match checkpoints advance their sibling search and re-enter. Loops, never
-/// recurses — a run of exhausted retries unwinds in one call.
-fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
-    'unwind: loop {
-        let Some((cp, snapshot)) = eng.pop_checkpoint() else {
-            return Unwound::NoMatch;
-        };
-        eng.restore_checkpoint_state(cp.state, snapshot);
-
-        match cp.resume {
-            rt::Resume::Successor => return Unwound::Resumed(cp.ip),
-
-@CALL_RESUME@
-
-            // Match retry: advance past the accepted-but-failed candidate and
-            // re-run that state's sibling search from there.
-            rt::Resume::Match => match match_retry(eng, @SOURCE@, cp.ip) {
-                Some(Flow::Jump(next)) => return Unwound::Resumed(next),
-                Some(Flow::Accept) => return Unwound::Accepted,@MATCH_RETRY_CALL_ERROR@
-                Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
-                None => continue 'unwind,
-            },
-        }
-    }
-}
-"#;
-
-const BACKTRACK_CALL_RESUME: &str = r#"            // Call retry: advance to the next candidate satisfying the field
-            // constraint, then re-enter the callee. Exhausted siblings keep
-            // unwinding to an earlier checkpoint.
-            rt::Resume::Call(resume) => {
-                if !eng.cursor_mut().continue_search(resume.policy) {
-                    continue 'unwind;
-                }
-                if let Some(field_id) = resume.field {
-                    loop {
-                        if eng.cursor().field_id() == Some(field_id) {
-                            break;
-                        }
-                        if !eng.cursor_mut().continue_search(resume.policy) {
-                            continue 'unwind;
-                        }
-                    }
-                }
-                eng.push_checkpoint(rt::Checkpoint::call_retry(
-                    eng.checkpoint_state(),
-                    cp.ip,
-                    resume,
-                ));
-                if let Err(error) = eng.enter_frame(resume.call_site) {
-                    return Unwound::CallFrameError(error);
-                }
-                return Unwound::Resumed(resume.target);
-            }"#;
-
-const BACKTRACK_CALL_RESUME_UNREACHABLE: &str =
-    r#"            rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),"#;
-
-const MATCH_RETRY_CALL_ERROR: &str = r#"
-                Some(Flow::CallFrameError(error)) => {
-                    return Unwound::CallFrameError(error);
-                }"#;
-
-const MATCH_RETRY_OPEN: &str = r#"
-fn match_retry<'t>(@ENG@: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Option<Flow> {
-    match ip {
-"#;
-
-const MATCH_RETRY_CLOSE: &str = "        _ => unreachable!(\"match-retry checkpoint ip {ip} must address a sibling-search Match\"),
-    }
-}
-";
-
-const MATCH_RETRY_EMPTY: &str = r#"
-fn match_retry(_eng: &mut rt::Engine<'_>, @SOURCE@: &str, ip: u16) -> Option<Flow> {
-    unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match")
-}
-"#;
-
-const RETRY_ADVANCE: &str = r#"
-if !eng.cursor_mut().continue_search(@POLICY@) {
-    return None;
-}
-"#;

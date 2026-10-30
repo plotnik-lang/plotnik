@@ -1,0 +1,21 @@
+Q = [
+  (A)
+  (B)
+]
+----------------- INPUT (a.ptk) ------------------
+A = (Leaf)
+----------------- INPUT (b.ptk) ------------------
+B = (Leaf)
+---------------- INPUT (leaf.ptk) ----------------
+Leaf = (identifier)
+------------------ DEFINITIONS -------------------
+Q
+  A
+    Leaf
+  B
+    Leaf
+A
+  Leaf
+B
+  Leaf
+Leaf

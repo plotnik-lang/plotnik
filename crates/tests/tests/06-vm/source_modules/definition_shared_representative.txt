@@ -1,0 +1,336 @@
+Q = (program
+  .
+  (expression_statement
+    (array
+      (identifier) @marker
+      {
+        (identifier) @node
+      }+ @nested :: Foo
+    )
+  )* @rows :: Shared
+  .
+  (Shared) @defined
+  .
+)
+--------------- INPUT (shared.ptk) ---------------
+Shared = (expression_statement
+  (array
+    (identifier) @marker
+    {
+      (identifier) @node
+    }+ @nested :: Bar
+  )
+)
+---------------- INPUT (input.js) ----------------
+[a, b, c]; [d, e];
+--------------------- OUTPUT ---------------------
+{
+  "defined": {
+    "marker": {
+      "kind": "identifier",
+      "span": [12, 13],
+      "text": "d"
+    },
+    "nested": [
+      {
+        "node": {
+          "kind": "identifier",
+          "span": [15, 16],
+          "text": "e"
+        }
+      }
+    ]
+  },
+  "rows": [
+    {
+      "marker": {
+        "kind": "identifier",
+        "span": [1, 2],
+        "text": "a"
+      },
+      "nested": [
+        {
+          "node": {
+            "kind": "identifier",
+            "span": [4, 5],
+            "text": "b"
+          }
+        },
+        {
+          "node": {
+            "kind": "identifier",
+            "span": [7, 8],
+            "text": "c"
+          }
+        }
+      ]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "node"
+S02 "marker"
+S03 "nested"
+S04 "rows"
+S05 "defined"
+S06 "Bar"
+S07 "Shared"
+S08 "Foo"
+S09 "Q"
+S10 "program"
+S11 "expression_statement"
+S12 "array"
+S13 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { node }
+T2 = ListOneOrMore(T1)  ; Bar+
+T3 = Record  M1:2  ; { marker, nested }
+T4 = Record  M3:1  ; { node }
+T5 = ListOneOrMore(T4)  ; Foo+
+T6 = Record  M4:2  ; { marker, nested }
+T7 = ListZeroOrMore(T6)  ; Shared*
+T8 = Record  M6:2  ; { rows, defined }
+
+[type_members]
+M0: S01 → T0  ; node: <Node>
+M1: S02 → T0  ; marker: <Node>
+M2: S03 → T2  ; nested: T2
+M3: S01 → T0  ; node: <Node>
+M4: S02 → T0  ; marker: <Node>
+M5: S03 → T5  ; nested: T5
+M6: S04 → T7  ; rows: T7
+M7: S05 → T3  ; defined: Shared
+
+[type_names]
+N0: S06 → T1  ; Bar
+N1: S07 → T3  ; Shared
+N2: S08 → T4  ; Foo
+N3: S07 → T6  ; Shared
+N4: S09 → T8  ; Q
+
+[entrypoints]
+Q      = 06 :: T8
+Shared = 00 :: T3
+
+[instructions]
+Shared:
+  00   !   (expression_statement)           01
+  01  └‣─  (array)                          02
+  02  └‣─  (identifier)                     04          [Node RecordSet(M1 marker)]
+  04  ──!  _                                13, 16      [ListOpen]
+
+Q:
+  06   !   (program)                        08
+  07  ...
+  08  -ε-                                   77, 59      [ListOpen]
+  10       return
+  11  -ε-                                   16, 18      [RecordClose ArrayPush]
+  13   !   (identifier)                     11          [RecordOpen Node RecordSet(M0 node)]
+  15  ...
+  16  ──!  _                                13, 16
+  18  ─‣┘² _                                10          [ListClose RecordSet(M2 nested)]
+  20       return
+  21  ─•┘  _                                20
+  22  -ε-                                   21          [RecordClose RecordSet(M7 defined)]
+  24       return
+  25  -ε-                                   29, 36      [RecordClose ArrayPush]
+  27   !   (identifier)                     25          [RecordOpen Node RecordSet(M0 node)]
+  29  ──!  _                                27, 29
+  31  ...
+  32  ──!  _                                27, 29      [ListOpen]
+  34  └‣─  (identifier)                     32          [Node RecordSet(M1 marker)]
+  36  ─‣┘² _                                24          [ListClose RecordSet(M2 nested)]
+  38  └‣─  (array)                          34
+  39  └•─  (expression_statement)           38
+  40       (@39)                            39 : 22
+  41       return
+  42  -ε-                                   46, 52      [RecordClose ArrayPush]
+  44   !   (identifier)                     42          [RecordOpen Node RecordSet(M0 node)]
+  46  ──!  _                                44, 46
+  48  ──!  _                                44, 46      [ListOpen]
+  50  └‣─  (identifier)                     48          [Node RecordSet(M1 marker)]
+  52  ─‣┘² _                                41          [ListClose RecordSet(M2 nested)]
+  54  └‣─  (array)                          50
+  55  ─•─  (expression_statement)           54
+  56       (@55)                            55 : 22
+  57  -ε-                                   56          [ListClose RecordSet(M6 rows) RecordOpen]
+  59  -ε-                                   40          [ListClose RecordSet(M6 rows) RecordOpen]
+  61  -ε-                                   91, 57      [RecordClose ArrayPush]
+  63  ...
+  64  -ε-                                   68, 74      [RecordClose ArrayPush]
+  66   !   (identifier)                     64          [RecordOpen Node RecordSet(M3 node)]
+  68  ──!  _                                66, 68
+  70  ──!  _                                66, 68      [ListOpen]
+  72  └‣─  (identifier)                     70          [Node RecordSet(M4 marker)]
+  74  ─‣┘² _                                61          [ListClose RecordSet(M5 nested)]
+  76  └‣─  (array)                          72
+  77  └•─  (expression_statement)           76          [RecordOpen]
+  79  ...
+  80  -ε-                                   84, 74      [RecordClose ArrayPush]
+  82   !   (identifier)                     80          [RecordOpen Node RecordSet(M3 node)]
+  84  ──!  _                                82, 84
+  86  ──!  _                                82, 84      [ListOpen]
+  88  └‣─  (identifier)                     86          [Node RecordSet(M4 marker)]
+  90  └‣─  (array)                          88
+  91  ─•─  (expression_statement)           90          [RecordOpen]
+--------------------- TRACE ----------------------
+Q:
+  06   !   (program)                        08
+       ●   (program)
+  08  -ε-                                   77, 59      [ListOpen]
+  77  └•─  (expression_statement)           76          [RecordOpen]
+       ●   (expression_statement)
+  76  └‣─  (array)                          72
+       ●   (array)
+  72  └‣─  (identifier)                     70          [Node RecordSet(M4 marker)]
+       ○   "["
+       ●   (identifier)
+  70  ──!  _                                66, 68      [ListOpen]
+       ●   ","
+  66   !   (identifier)                     64          [RecordOpen Node RecordSet(M3 node)]
+       ○   ","
+       ○   no candidate
+  70  ❮❮❮
+  68  ──!  _                                66, 68
+       ●   (identifier)
+  66   !   (identifier)                     64          [RecordOpen Node RecordSet(M3 node)]
+       ●   (identifier)
+  64  -ε-                                   68, 74      [RecordClose ArrayPush]
+  68  ──!  _                                66, 68
+       ●   ","
+  66   !   (identifier)                     64          [RecordOpen Node RecordSet(M3 node)]
+       ○   ","
+       ○   no candidate
+  68  ❮❮❮
+  68  ──!  _                                66, 68
+       ●   (identifier)
+  66   !   (identifier)                     64          [RecordOpen Node RecordSet(M3 node)]
+       ●   (identifier)
+  64  -ε-                                   68, 74      [RecordClose ArrayPush]
+  68  ──!  _                                66, 68
+       ●   "]"
+  66   !   (identifier)                     64          [RecordOpen Node RecordSet(M3 node)]
+       ○   "]"
+       ○   no candidate
+  68  ❮❮❮
+  68  ──!  _                                66, 68
+       ○   no candidate
+  64  ❮❮❮
+  74  ─‣┘² _                                61          [ListClose RecordSet(M5 nested)]
+       ●   (expression_statement)
+  61  -ε-                                   91, 57      [RecordClose ArrayPush]
+  91  ─•─  (expression_statement)           90          [RecordOpen]
+       ●   (expression_statement)
+  90  └‣─  (array)                          88
+       ●   (array)
+  88  └‣─  (identifier)                     86          [Node RecordSet(M4 marker)]
+       ○   "["
+       ●   (identifier)
+  86  ──!  _                                82, 84      [ListOpen]
+       ●   ","
+  82   !   (identifier)                     80          [RecordOpen Node RecordSet(M3 node)]
+       ○   ","
+       ○   no candidate
+  86  ❮❮❮
+  84  ──!  _                                82, 84
+       ●   (identifier)
+  82   !   (identifier)                     80          [RecordOpen Node RecordSet(M3 node)]
+       ●   (identifier)
+  80  -ε-                                   84, 74      [RecordClose ArrayPush]
+  84  ──!  _                                82, 84
+       ●   "]"
+  82   !   (identifier)                     80          [RecordOpen Node RecordSet(M3 node)]
+       ○   "]"
+       ○   no candidate
+  84  ❮❮❮
+  84  ──!  _                                82, 84
+       ○   no candidate
+  80  ❮❮❮
+  74  ─‣┘² _                                61          [ListClose RecordSet(M5 nested)]
+       ●   (expression_statement)
+  61  -ε-                                   91, 57      [RecordClose ArrayPush]
+  91  ─•─  (expression_statement)           90          [RecordOpen]
+       ○   no candidate
+  61  ❮❮❮
+  57  -ε-                                   56          [ListClose RecordSet(M6 rows) RecordOpen]
+  56       (@55)                            55 : 22
+       ▶   (@55)
+
+@55:
+  55  ─•─  (expression_statement)           54
+       ○   no candidate
+  84  ❮❮❮
+  84  ──!  _                                82, 84
+       ●   "]"
+  82   !   (identifier)                     80          [RecordOpen Node RecordSet(M3 node)]
+       ○   "]"
+       ○   no candidate
+  84  ❮❮❮
+  84  ──!  _                                82, 84
+       ○   no candidate
+  88  ❮❮❮
+  88  └‣─  (identifier)                     86          [Node RecordSet(M4 marker)]
+       ○   ","
+       ●   (identifier)
+  86  ──!  _                                82, 84      [ListOpen]
+       ●   "]"
+  82   !   (identifier)                     80          [RecordOpen Node RecordSet(M3 node)]
+       ○   "]"
+       ○   no candidate
+  86  ❮❮❮
+  84  ──!  _                                82, 84
+       ○   no candidate
+  88  ❮❮❮
+  88  └‣─  (identifier)                     86          [Node RecordSet(M4 marker)]
+       ○   "]"
+       ○   no candidate
+  90  ❮❮❮
+  90  └‣─  (array)                          88
+       ○   ";"
+       ○   no candidate
+  61  ❮❮❮
+  57  -ε-                                   56          [ListClose RecordSet(M6 rows) RecordOpen]
+  56       (@55)                            55 : 22
+       ▶   (@55)
+
+@55:
+  55  ─•─  (expression_statement)           54
+       ●   (expression_statement)
+  54  └‣─  (array)                          50
+       ●   (array)
+  50  └‣─  (identifier)                     48          [Node RecordSet(M1 marker)]
+       ○   "["
+       ●   (identifier)
+  48  ──!  _                                44, 46      [ListOpen]
+       ●   ","
+  44   !   (identifier)                     42          [RecordOpen Node RecordSet(M0 node)]
+       ○   ","
+       ○   no candidate
+  48  ❮❮❮
+  46  ──!  _                                44, 46
+       ●   (identifier)
+  44   !   (identifier)                     42          [RecordOpen Node RecordSet(M0 node)]
+       ●   (identifier)
+  42  -ε-                                   46, 52      [RecordClose ArrayPush]
+  46  ──!  _                                44, 46
+       ●   "]"
+  44   !   (identifier)                     42          [RecordOpen Node RecordSet(M0 node)]
+       ○   "]"
+       ○   no candidate
+  46  ❮❮❮
+  46  ──!  _                                44, 46
+       ○   no candidate
+  42  ❮❮❮
+  52  ─‣┘² _                                41          [ListClose RecordSet(M2 nested)]
+       ●   (expression_statement)
+  41   ◀   return                           22
+
+Q:
+  22  -ε-                                   21          [RecordClose RecordSet(M7 defined)]
+  21  ─•┘  _                                20
+       ●   (program)
+  20   ◀   return                           ◼

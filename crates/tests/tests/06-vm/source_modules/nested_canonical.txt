@@ -1,0 +1,146 @@
+Q = (program
+  {
+    (expression_statement
+      {
+        (array
+          {
+            (identifier) @value
+          } @inner :: LocalLeaf
+        )
+      } @middle :: LocalMiddle
+    )
+  } @shared :: Shared
+)
+--------------- INPUT (middle.ptk) ---------------
+Middle = (array
+  {
+    (identifier) @value
+  } @inner :: FinalLeaf
+)
+--------------- INPUT (shared.ptk) ---------------
+Shared = (expression_statement
+  {
+    (array
+      {
+        (identifier) @value
+      } @inner :: MidLeaf
+    )
+  } @middle :: Middle
+)
+---------------- INPUT (input.js) ----------------
+[x];
+--------------------- OUTPUT ---------------------
+{
+  "shared": {
+    "middle": {
+      "inner": {
+        "value": {
+          "kind": "identifier",
+          "span": [1, 2],
+          "text": "x"
+        }
+      }
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "value"
+S02 "inner"
+S03 "middle"
+S04 "shared"
+S05 "LocalLeaf"
+S06 "LocalMiddle"
+S07 "Shared"
+S08 "Q"
+S09 "FinalLeaf"
+S10 "Middle"
+S11 "MidLeaf"
+S12 "program"
+S13 "expression_statement"
+S14 "array"
+S15 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { value }
+T2 = Record  M1:1  ; { inner }
+T3 = Record  M2:1  ; { middle }
+T4 = Record  M3:1  ; { shared }
+T5 = Record  M4:1  ; { value }
+T6 = Record  M5:1  ; { inner }
+T7 = Record  M6:1  ; { value }
+T8 = Record  M7:1  ; { inner }
+T9 = Record  M8:1  ; { middle }
+
+[type_members]
+M0: S01 → T0  ; value: <Node>
+M1: S02 → T1  ; inner: LocalLeaf
+M2: S03 → T2  ; middle: LocalMiddle
+M3: S04 → T3  ; shared: Shared
+M4: S01 → T0  ; value: <Node>
+M5: S02 → T5  ; inner: FinalLeaf
+M6: S01 → T0  ; value: <Node>
+M7: S02 → T7  ; inner: MidLeaf
+M8: S03 → T8  ; middle: Middle
+
+[type_names]
+N0: S05 → T1  ; LocalLeaf
+N1: S06 → T2  ; LocalMiddle
+N2: S07 → T3  ; Shared
+N3: S08 → T4  ; Q
+N4: S09 → T5  ; FinalLeaf
+N5: S10 → T6  ; Middle
+N6: S11 → T7  ; MidLeaf
+N7: S10 → T8  ; Middle
+N8: S07 → T9  ; Shared
+
+[entrypoints]
+Middle = 15 :: T6
+Q      = 00 :: T4
+Shared = 21 :: T9
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (expression_statement)           03          [RecordOpen]
+  03  └‣─  (array)                          05          [RecordOpen]
+  05  └‣─  (identifier)                     08          [RecordOpen Node RecordSet(M0 value)]
+  07  ...
+  08  ─‣┘  _                                10          [RecordClose RecordSet(M1 inner)]
+  10  ─‣┘  _                                12          [RecordClose RecordSet(M2 middle)]
+  12  ─‣┘  _                                14          [RecordClose RecordSet(M3 shared)]
+  14       return
+
+Middle:
+  15   !   (array)                          16
+  16  └‣─  (identifier)                     18          [RecordOpen Node RecordSet(M4 value)]
+  18  ─‣┘  _                                20          [RecordClose RecordSet(M5 inner)]
+  20       return
+
+Shared:
+  21   !   (expression_statement)           22
+  22  └‣─  (array)                          24          [RecordOpen]
+  24  └‣─  (identifier)                     26          [RecordOpen Node RecordSet(M6 value)]
+  26  ─‣┘  _                                28          [RecordClose RecordSet(M7 inner)]
+  28  ─‣┘  _                                30          [RecordClose RecordSet(M8 middle)]
+  30       return
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (expression_statement)           03          [RecordOpen]
+       ●   (expression_statement)
+  03  └‣─  (array)                          05          [RecordOpen]
+       ●   (array)
+  05  └‣─  (identifier)                     08          [RecordOpen Node RecordSet(M0 value)]
+       ○   "["
+       ●   (identifier)
+  08  ─‣┘  _                                10          [RecordClose RecordSet(M1 inner)]
+       ●   (array)
+  10  ─‣┘  _                                12          [RecordClose RecordSet(M2 middle)]
+       ●   (expression_statement)
+  12  ─‣┘  _                                14          [RecordClose RecordSet(M3 shared)]
+       ●   (program)
+  14   ◀   return                           ◼

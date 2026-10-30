@@ -57,9 +57,8 @@ pub enum Resume {
     Match,
 }
 
-/// The VM state a checkpoint snapshots and later restores: everything shared
-/// by both successor and Call-retry checkpoints. Bundling these fields keeps the
-/// snapshot at creation and the restore on backtrack in lockstep.
+/// The execution state a checkpoint snapshots and later restores. Bundling these
+/// fields keeps the snapshot at creation and the restore on backtrack in lockstep.
 #[derive(Clone, Copy, Debug)]
 pub struct CheckpointState {
     /// Cursor position (tree-sitter descendant_index) — always present; the
@@ -76,14 +75,29 @@ pub struct CheckpointState {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Checkpoint {
-    /// VM state to restore on backtrack.
-    pub state: CheckpointState,
+pub struct VmResume {
     /// Successor resume target, or the owning instruction's own address for
     /// Call/Match retries (re-decoded on resume; also used for tracing).
     pub ip: u16,
-    /// How backtracking continues after restoring `state`.
+    /// How VM backtracking continues after restoring checkpoint state.
     pub resume: Resume,
+}
+
+impl From<u16> for VmResume {
+    fn from(ip: u16) -> Self {
+        Self {
+            ip,
+            resume: Resume::Successor,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Checkpoint<R = VmResume> {
+    /// Execution state to restore on backtrack.
+    pub state: CheckpointState,
+    /// Executor-owned continuation: VM retry information or a generated block.
+    pub resume: R,
     pub(crate) max_frame_idx_below: Option<u32>,
 }
 
@@ -93,27 +107,28 @@ struct CheckpointSnapshot {
     snapshot: NonZeroU64,
 }
 
-impl Checkpoint {
-    /// Create a checkpoint that resumes at successor address `ip`.
-    pub fn successor(state: CheckpointState, ip: u16) -> Self {
+impl<R> Checkpoint<R> {
+    pub fn new(state: CheckpointState, resume: R) -> Self {
         Self {
             state,
-            ip,
-            resume: Resume::Successor,
+            resume,
             max_frame_idx_below: None,
         }
     }
+}
 
+impl Checkpoint<VmResume> {
     /// Create a Call retry checkpoint that advances and re-enters the callee.
     /// `call_ip` is the Call's own address, retained only for trace rendering;
     /// re-entry is driven entirely by `call_resume`.
     pub fn call_retry(state: CheckpointState, call_ip: u16, call_resume: CallResume) -> Self {
-        Self {
+        Self::new(
             state,
-            ip: call_ip,
-            resume: Resume::Call(call_resume),
-            max_frame_idx_below: None,
-        }
+            VmResume {
+                ip: call_ip,
+                resume: Resume::Call(call_resume),
+            },
+        )
     }
 
     /// Create a Match retry checkpoint: `state` snapshots the accepted
@@ -121,12 +136,13 @@ impl Checkpoint {
     /// backtrack the engine advances past the candidate and re-runs the
     /// match's sibling search from there.
     pub fn match_retry(state: CheckpointState, match_ip: u16) -> Self {
-        Self {
+        Self::new(
             state,
-            ip: match_ip,
-            resume: Resume::Match,
-            max_frame_idx_below: None,
-        }
+            VmResume {
+                ip: match_ip,
+                resume: Resume::Match,
+            },
+        )
     }
 }
 
@@ -137,13 +153,13 @@ impl Checkpoint {
 /// frames are safe to remove. It is kept current through each checkpoint's
 /// `max_frame_idx_below` prefix-max rather than recomputed on backtrack.
 #[derive(Debug)]
-pub struct CheckpointStack {
-    stack: Vec<Checkpoint>,
+pub struct CheckpointStack<R = VmResume> {
+    stack: Vec<Checkpoint<R>>,
     snapshots: Vec<CheckpointSnapshot>,
     max_frame_idx: Option<u32>,
 }
 
-impl CheckpointStack {
+impl<R> CheckpointStack<R> {
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),
@@ -159,12 +175,12 @@ impl CheckpointStack {
         self.max_frame_idx = None;
     }
 
-    pub fn push(&mut self, mut checkpoint: Checkpoint) {
+    pub fn push(&mut self, mut checkpoint: Checkpoint<R>) {
         self.push_inner(&mut checkpoint);
         self.stack.push(checkpoint);
     }
 
-    pub fn push_with_snapshot(&mut self, mut checkpoint: Checkpoint, snapshot: NonZeroU64) {
+    pub fn push_with_snapshot(&mut self, mut checkpoint: Checkpoint<R>, snapshot: NonZeroU64) {
         let stack_index = self.stack.len();
         self.push_inner(&mut checkpoint);
         self.stack.push(checkpoint);
@@ -174,7 +190,7 @@ impl CheckpointStack {
         });
     }
 
-    fn push_inner(&mut self, checkpoint: &mut Checkpoint) {
+    fn push_inner(&mut self, checkpoint: &mut Checkpoint<R>) {
         let prev = self.stack.last().and_then(|c| c.max_frame_idx_below);
         checkpoint.max_frame_idx_below = match (checkpoint.state.frame_index, prev) {
             (Some(a), Some(b)) => Some(a.max(b)),
@@ -183,7 +199,7 @@ impl CheckpointStack {
         self.max_frame_idx = checkpoint.max_frame_idx_below;
     }
 
-    pub fn pop(&mut self) -> Option<Checkpoint> {
+    pub fn pop(&mut self) -> Option<Checkpoint<R>> {
         assert!(
             self.snapshots.is_empty(),
             "checkpoint stack used `pop` while {} cursor snapshot metadata entries remain; \
@@ -195,7 +211,7 @@ impl CheckpointStack {
         Some(cp)
     }
 
-    pub fn pop_with_snapshot(&mut self) -> Option<(Checkpoint, Option<NonZeroU64>)> {
+    pub fn pop_with_snapshot(&mut self) -> Option<(Checkpoint<R>, Option<NonZeroU64>)> {
         let Some(stack_index) = self.stack.len().checked_sub(1) else {
             assert!(
                 self.snapshots.is_empty(),
@@ -243,12 +259,12 @@ impl CheckpointStack {
     /// Occupied checkpoint and snapshot-metadata bytes, excluding spare capacity.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {
-        (self.stack.len() * std::mem::size_of::<Checkpoint>()
+        (self.stack.len() * std::mem::size_of::<Checkpoint<R>>()
             + self.snapshots.len() * std::mem::size_of::<CheckpointSnapshot>()) as u64
     }
 }
 
-impl Default for CheckpointStack {
+impl<R> Default for CheckpointStack<R> {
     fn default() -> Self {
         Self::new()
     }

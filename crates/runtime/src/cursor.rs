@@ -261,7 +261,7 @@ impl<'t> CursorWrapper<'t> {
 
     #[inline]
     pub fn is_trivia(node: &Node<'_>) -> bool {
-        SkipClass::Trivia.admits(NodeClass::from_node(node))
+        SkipClass::Trivia.admits(|| NodeClass::from_node(node))
     }
 
     /// Navigate according to Nav command, preparing for match attempt.
@@ -269,6 +269,7 @@ impl<'t> CursorWrapper<'t> {
     /// Returns the skip policy to use for the subsequent match attempt
     /// ([`Nav::skip_policy`] — the single source of the nav→policy mapping),
     /// or None if navigation failed (no children/siblings).
+    #[inline]
     pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
         let moved = match nav {
             Nav::Epsilon => unreachable!(
@@ -303,7 +304,7 @@ impl<'t> CursorWrapper<'t> {
             return true;
         }
         loop {
-            if !skip_class.admits(NodeClass::from_node(&self.cursor.node())) {
+            if !skip_class.admits(|| NodeClass::from_node(&self.cursor.node())) {
                 self.goto_descendant(origin);
                 return false;
             }
@@ -319,6 +320,7 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_next_sibling()
     }
 
+    #[inline]
     fn go_up(&mut self, levels: u8, mode: UpMode) -> bool {
         let origin = self.descendant_index();
         for _ in 0..levels {
@@ -330,6 +332,7 @@ impl<'t> CursorWrapper<'t> {
         true
     }
 
+    #[inline]
     fn exit_constraint_holds(&mut self, mode: UpMode) -> bool {
         match mode {
             UpMode::Any => true,
@@ -349,7 +352,7 @@ impl<'t> CursorWrapper<'t> {
             UpMode::SkipTrivia => self.is_last_child_skipping(Self::is_trivia),
             UpMode::SkipExtras => {
                 let skip_class = mode.skip_class();
-                self.is_last_child_skipping(|n| skip_class.admits(NodeClass::from_node(n)))
+                self.is_last_child_skipping(|n| skip_class.admits(|| NodeClass::from_node(n)))
             }
         }
     }
@@ -375,11 +378,12 @@ impl<'t> CursorWrapper<'t> {
     /// - `Trivia`: Skip trivia siblings only, fail if non-trivia
     /// - `Extras`: Skip tree-sitter extras only, fail otherwise
     /// - `Any`: Skip any siblings
+    #[inline]
     pub fn continue_search(&mut self, policy: SkipPolicy) -> bool {
         match policy {
             SkipPolicy::Exact => false,
             SkipPolicy::Trivia | SkipPolicy::Extras => {
-                if !policy.admits(&self.cursor.node()) {
+                if !policy.admits(|| self.cursor.node()) {
                     return false;
                 }
                 self.cursor.goto_next_sibling()

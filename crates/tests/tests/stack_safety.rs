@@ -15,6 +15,14 @@ const QUERY: &str = indoc! {"
     Top = (program (expression_statement (Rec)))
 "};
 
+mod generated {
+    plotnik::query! {
+        "Rec = [Leaf: (number) Deep: (unary_expression (Rec))]
+         Top = (program (expression_statement (Rec)))",
+        grammar = "tree-sitter-javascript",
+    }
+}
+
 fn compile(query: &str) -> Module {
     let compiled = QueryBuilder::from_inline(query)
         .compile(support::javascript_grammar())
@@ -37,6 +45,8 @@ fn deep_backtrack_does_not_overflow_native_stack() {
 
     let source = format!("{}x", "!".repeat(DEPTH));
     let tree = support::parse_javascript(&source);
+    let accepted_source = format!("{}0", "!".repeat(DEPTH));
+    let accepted_tree = support::parse_javascript(&accepted_source);
 
     let entry = module.entrypoint("Top").expect("Top is an entrypoint");
 
@@ -45,6 +55,17 @@ fn deep_backtrack_does_not_overflow_native_stack() {
             .name("deep-backtrack".into())
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
+                assert_eq!(
+                    generated::Top::exec(accepted_tree.root_node(), &accepted_source)
+                        .expect("generated deep match completes"),
+                    Some(accepted_tree.root_node())
+                );
+                assert_eq!(
+                    generated::Top::exec(tree.root_node(), &source)
+                        .expect("generated deep backtracking completes"),
+                    None
+                );
+
                 let vm = VM::new(&source, tree.root_node());
                 let mut tracer = NoopTracer;
                 let result = vm.execute_with(&module, &entry, &mut tracer);

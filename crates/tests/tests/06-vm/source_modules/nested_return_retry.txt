@@ -1,0 +1,245 @@
+Q = (program
+  .
+  (Left) @left
+  .
+  (expression_statement
+    (number) @first_tail :: text
+  )
+  .
+  (Right) @right
+  .
+  (expression_statement
+    (number) @second_tail :: text
+  )
+  .
+)
+---------------- INPUT (left.ptk) ----------------
+Left = (Piece) @piece
+--------------- INPUT (right.ptk) ----------------
+Right = (Piece) @value
+--------------- INPUT (piece.ptk) ----------------
+Piece = [
+  Short: (expression_statement
+    (identifier) @first :: text
+  )
+  Long: {
+    (expression_statement
+      (identifier) @first :: text
+    )
+    .
+    (expression_statement
+      (identifier) @second :: text
+    )
+  }
+]
+---------------- INPUT (input.js) ----------------
+a; b; 7; c; 9;
+--------------------- OUTPUT ---------------------
+{
+  "first_tail": "7",
+  "left": {
+    "piece": {
+      "$data": {
+        "first": "a",
+        "second": "b"
+      },
+      "$tag": "Long"
+    }
+  },
+  "right": {
+    "value": {
+      "$data": {
+        "first": "c"
+      },
+      "$tag": "Short"
+    }
+  },
+  "second_tail": "9"
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "first"
+S02 "second"
+S03 "Short"
+S04 "Long"
+S05 "piece"
+S06 "value"
+S07 "left"
+S08 "first_tail"
+S09 "right"
+S10 "second_tail"
+S11 "Piece"
+S12 "Left"
+S13 "Right"
+S14 "Q"
+S15 "program"
+S16 "expression_statement"
+S17 "number"
+S18 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M00:1  ; { first }
+T2 = Record  M01:2  ; { first, second }
+T3 = Variant M03:2  ; Short | Long
+T4 = Record  M05:1  ; { piece }
+T5 = Record  M06:1  ; { value }
+T6 = Record  M07:4  ; { left, first_tail, right, second_tail }
+
+[type_members]
+M00: S01 → T0  ; first: <Text>
+M01: S01 → T0  ; first: <Text>
+M02: S02 → T0  ; second: <Text>
+M03: S03 → T1  ; Short: T1
+M04: S04 → T2  ; Long: T2
+M05: S05 → T3  ; piece: Piece
+M06: S06 → T3  ; value: Piece
+M07: S07 → T4  ; left: Left
+M08: S08 → T0  ; first_tail: <Text>
+M09: S09 → T5  ; right: Right
+M10: S10 → T0  ; second_tail: <Text>
+
+[type_names]
+N0: S11 → T3  ; Piece
+N1: S12 → T4  ; Left
+N2: S13 → T5  ; Right
+N3: S14 → T6  ; Q
+
+[entrypoints]
+Q = 00 :: T6
+
+[instructions]
+Q:
+  00   !   (program)                        02          [RecordOpen]
+  02       (@60)                            60 : 03
+  03  ─•─  (expression_statement)           05          [RecordClose RecordSet(M7 left)]
+  05  └‣─  (number)                         08          [NodeText RecordSet(M8 first_tail)]
+  07  ─•─  (expression_statement)           34
+  08  ─‣┘  _                                10          [RecordOpen]
+  10       (@42)                            42 : 11
+  11  ─•─  (expression_statement)           13          [RecordClose RecordSet(M9 right)]
+  13  └‣─  (number)                         15          [NodeText RecordSet(M10 second_tail)]
+  15  ─‣┘  _                                16
+  16  ─•┘  _                                17
+  17       return
+  18  └‣─  (identifier)                     20          [NodeText RecordSet(M1 first)]
+  20  ─‣┘  _                                07
+  21  └‣─  (identifier)                     23          [NodeText RecordSet(M1 first)]
+  23  ─‣┘  _                                38
+  24       return
+  25  -ε-                                   24          [RecordSet(M6 value)]
+  27       return
+  28  └‣─  (identifier)                     30          [NodeText RecordSet(M0 first)]
+  30  ─‣┘  _                                27          [VariantClose]
+  32  ─•─  (expression_statement)           28          [VariantOpen(M3 Short)]
+  34  └‣─  (identifier)                     30          [NodeText RecordSet(M2 second)]
+  36  ─•─  (expression_statement)           18          [VariantOpen(M4 Long)]
+  38  ─•─  (expression_statement)           54
+  39  ...
+  40  -ε-                                   32, 36
+  42       (@40)                            40 : 25
+  43       return
+  44  -ε-                                   43          [RecordSet(M5 piece)]
+  46       return
+  47  ...
+  48  └‣─  (identifier)                     50          [NodeText RecordSet(M0 first)]
+  50  ─‣┘  _                                46          [VariantClose]
+  52  └•─  (expression_statement)           48          [VariantOpen(M3 Short)]
+  54  └‣─  (identifier)                     50          [NodeText RecordSet(M2 second)]
+  56  └•─  (expression_statement)           21          [VariantOpen(M4 Long)]
+  58  -ε-                                   52, 56
+  60       (@58)                            58 : 44
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        02          [RecordOpen]
+       ●   (program)
+  02       (@60)                            60 : 03
+       ▶   (@60)
+
+@60:
+  60       (@58)                            58 : 44
+       ▶   (@58)
+
+@58:
+  58  -ε-                                   52, 56
+  52  └•─  (expression_statement)           48          [VariantOpen(M3 Short)]
+       ●   (expression_statement)
+  48  └‣─  (identifier)                     50          [NodeText RecordSet(M0 first)]
+       ●   (identifier)
+  50  ─‣┘  _                                46          [VariantClose]
+       ●   (expression_statement)
+  46   ◀   return                           44
+
+@60:
+  44  -ε-                                   43          [RecordSet(M5 piece)]
+  43   ◀   return                           03
+
+Q:
+  03  ─•─  (expression_statement)           05          [RecordClose RecordSet(M7 left)]
+       ●   (expression_statement)
+  05  └‣─  (number)                         08          [NodeText RecordSet(M8 first_tail)]
+       ○   (identifier)
+       ○   ";"
+       ○   no candidate
+  48  ❮❮❮
+  48  └‣─  (identifier)                     50          [NodeText RecordSet(M0 first)]
+       ○   ";"
+       ○   no candidate
+  58  ❮❮❮
+  56  └•─  (expression_statement)           21          [VariantOpen(M4 Long)]
+       ●   (expression_statement)
+  21  └‣─  (identifier)                     23          [NodeText RecordSet(M1 first)]
+       ●   (identifier)
+  23  ─‣┘  _                                38
+       ●   (expression_statement)
+  38  ─•─  (expression_statement)           54
+       ●   (expression_statement)
+  54  └‣─  (identifier)                     50          [NodeText RecordSet(M2 second)]
+       ●   (identifier)
+  50  ─‣┘  _                                46          [VariantClose]
+       ●   (expression_statement)
+  46   ◀   return                           44
+
+@60:
+  44  -ε-                                   43          [RecordSet(M5 piece)]
+  43   ◀   return                           03
+
+Q:
+  03  ─•─  (expression_statement)           05          [RecordClose RecordSet(M7 left)]
+       ●   (expression_statement)
+  05  └‣─  (number)                         08          [NodeText RecordSet(M8 first_tail)]
+       ●   (number)
+  08  ─‣┘  _                                10          [RecordOpen]
+       ●   (expression_statement)
+  10       (@42)                            42 : 11
+       ▶   (@42)
+
+@42:
+  42       (@40)                            40 : 25
+       ▶   (@40)
+
+@40:
+  40  -ε-                                   32, 36
+  32  ─•─  (expression_statement)           28          [VariantOpen(M3 Short)]
+       ●   (expression_statement)
+  28  └‣─  (identifier)                     30          [NodeText RecordSet(M0 first)]
+       ●   (identifier)
+  30  ─‣┘  _                                27          [VariantClose]
+       ●   (expression_statement)
+  27   ◀   return                           25
+
+@42:
+  25  -ε-                                   24          [RecordSet(M6 value)]
+  24   ◀   return                           11
+
+Q:
+  11  ─•─  (expression_statement)           13          [RecordClose RecordSet(M9 right)]
+       ●   (expression_statement)
+  13  └‣─  (number)                         15          [NodeText RecordSet(M10 second_tail)]
+       ●   (number)
+  15  ─‣┘  _                                16
+       ●   (expression_statement)
+  16  ─•┘  _                                17
+       ●   (program)
+  17   ◀   return                           ◼

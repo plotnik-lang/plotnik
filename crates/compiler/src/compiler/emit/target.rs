@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use plotnik_runtime::Limit;
 
 use crate::bytecode::Module;
-use crate::compiler::diagnostics::{Diagnostics, QueryResult};
+use crate::compiler::diagnostics::{Diagnostics, QueryResult, SourceId};
 use crate::compiler::query::CompiledQuery;
 
 /// The artifact and emission-local diagnostics produced by one target.
@@ -259,3 +259,24 @@ macro_rules! source_output {
 
 source_output!(RustModuleOutput);
 source_output!(RustTypesOutput);
+
+/// A Rust module generated from one query file.
+pub struct RustSourceOutput {
+    pub(crate) source_id: SourceId,
+    pub(crate) module_name: String,
+    pub(crate) source: String,
+}
+
+impl RustSourceOutput {
+    pub fn source_id(&self) -> SourceId {
+        self.source_id
+    }
+
+    pub fn module_name(&self) -> &str {
+        &self.module_name
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+}

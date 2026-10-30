@@ -7,8 +7,8 @@ pub(crate) mod targets;
 
 pub use target::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, Emission,
-    EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,
+    EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustSourceOutput,
+    RustTypesOutput,
 };
 
 pub(crate) use plan::CodegenPlan;
-pub use targets::rust::journal_fn_name;

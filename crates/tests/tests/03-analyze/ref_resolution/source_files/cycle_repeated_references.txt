@@ -1,0 +1,40 @@
+Q = (A)
+----------------- INPUT (a.ptk) ------------------
+A = [
+  (B)
+  (B)
+]
+
+Leaf = (identifier)
+----------------- INPUT (b.ptk) ------------------
+B = (identifier)
+
+D = [
+  (Leaf)
+  (Leaf)
+]
+------------------ DIAGNOSTICS -------------------
+error: source files form a dependency cycle
+ --> a.ptk:2:4
+  |
+2 |   (B)
+  |    ^
+  |    |
+  |    A references B in another source file
+  |
+ ::: b.ptk:4:4
+  |
+4 |   (Leaf)
+  |    ---- D references Leaf in another source file (completing file cycle)
+  |
+help: move mutually dependent definitions into the same source file, or remove a cross-file reference
+------------------ DEFINITIONS -------------------
+Q
+  A
+    B
+A
+  B
+Leaf
+B
+D
+  Leaf

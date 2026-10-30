@@ -22,7 +22,7 @@ impl GapClass {
     }
 
     pub(crate) fn admits(self, node: NodeClass) -> bool {
-        self.skip_class().admits(node)
+        self.skip_class().admits(|| node)
     }
 
     fn permissiveness(self) -> u8 {

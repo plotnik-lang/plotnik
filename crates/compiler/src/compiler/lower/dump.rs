@@ -74,18 +74,6 @@ impl<'a> NfaDumper<'a> {
             InstructionIR::Return(r) => self.format_return(r),
         }
     }
-
-    pub(crate) fn label_width(&self) -> usize {
-        self.label_width
-    }
-
-    pub(crate) fn def_name_of(&self, label: Label) -> &str {
-        match self.origin_of(label) {
-            LabelOrigin::Expression => "<expression>",
-            LabelOrigin::Def(id) => self.def_name(id),
-            LabelOrigin::DefSpecialization { def_id, .. } => self.def_name(def_id),
-        }
-    }
 }
 
 impl<'a> NfaDumper<'a> {

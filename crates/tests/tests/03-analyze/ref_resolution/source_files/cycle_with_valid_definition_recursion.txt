@@ -1,0 +1,37 @@
+Q = (A)
+----------------- INPUT (a.ptk) ------------------
+A = [
+  (identifier)
+  (parenthesized_expression (B))
+]
+----------------- INPUT (b.ptk) ------------------
+B = [
+  (identifier)
+  (parenthesized_expression (A))
+]
+------------------ DIAGNOSTICS -------------------
+error: source files form a dependency cycle
+ --> a.ptk:3:30
+  |
+3 |   (parenthesized_expression (B))
+  |                              ^
+  |                              |
+  |                              A references B in another source file
+  |
+ ::: b.ptk:3:30
+  |
+3 |   (parenthesized_expression (A))
+  |                              - B references A in another source file (completing file cycle)
+  |
+help: move mutually dependent definitions into the same source file, or remove a cross-file reference
+------------------ DEFINITIONS -------------------
+Q
+  A
+    B
+      A (cycle)
+A
+  B
+    A (cycle)
+B
+  A
+    B (cycle)

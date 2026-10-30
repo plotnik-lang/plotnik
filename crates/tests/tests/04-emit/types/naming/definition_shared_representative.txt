@@ -1,0 +1,37 @@
+Q = (program
+  (expression_statement
+    (array
+      (identifier) @marker
+      {
+        (identifier) @node
+      }+ @nested :: Foo
+    )
+  )* @rows :: Shared
+)
+--------------- INPUT (shared.ptk) ---------------
+Shared = (expression_statement
+  (array
+    (identifier) @marker
+    {
+      (identifier) @node
+    }+ @nested :: Bar
+  )
+)
+---------------------- RUST ----------------------
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub rows: ::std::vec::Vec<Shared<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Shared<'t> {
+    pub marker: Node<'t>,
+    pub nested: ::std::vec::Vec<Bar<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Bar<'t> {
+    pub node: Node<'t>,
+}

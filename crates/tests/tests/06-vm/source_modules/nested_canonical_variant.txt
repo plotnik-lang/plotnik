@@ -1,0 +1,272 @@
+Q = (program
+  [
+    Some: {
+      (expression_statement
+        {
+          (array
+            {
+              (identifier) @value
+            } @inner :: LocalLeaf
+          )
+        } @middle :: LocalMiddle
+      )
+    } @shared :: Shared
+    None: (empty_statement)
+  ]* @rows :: Choices
+)
+--------------- INPUT (middle.ptk) ---------------
+Middle = (array
+  {
+    (identifier) @value
+  } @inner :: FinalLeaf
+)
+--------------- INPUT (shared.ptk) ---------------
+Shared = (expression_statement
+  {
+    (array
+      {
+        (identifier) @value
+      } @inner :: MidLeaf
+    )
+  } @middle :: Middle
+)
+-------------- INPUT (choices.ptk) ---------------
+Choices = [
+  Some: {
+    (expression_statement
+      {
+        (array
+          {
+            (identifier) @value
+          } @inner :: ChoiceLeaf
+        )
+      } @middle :: Middle
+    )
+  } @shared :: Shared
+  None: (empty_statement)
+]
+---------------- INPUT (input.js) ----------------
+[x]; ; [yz];
+--------------------- OUTPUT ---------------------
+{
+  "rows": [
+    {
+      "$data": {
+        "shared": {
+          "middle": {
+            "inner": {
+              "value": {
+                "kind": "identifier",
+                "span": [1, 2],
+                "text": "x"
+              }
+            }
+          }
+        }
+      },
+      "$tag": "Some"
+    },
+    {
+      "$tag": "None"
+    },
+    {
+      "$data": {
+        "shared": {
+          "middle": {
+            "inner": {
+              "value": {
+                "kind": "identifier",
+                "span": [8, 10],
+                "text": "yz"
+              }
+            }
+          }
+        }
+      },
+      "$tag": "Some"
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "value"
+S02 "inner"
+S03 "middle"
+S04 "shared"
+S05 "Some"
+S06 "None"
+S07 "rows"
+S08 "LocalLeaf"
+S09 "LocalMiddle"
+S10 "Shared"
+S11 "Choices"
+S12 "Q"
+S13 "FinalLeaf"
+S14 "Middle"
+S15 "MidLeaf"
+S16 "ChoiceLeaf"
+S17 "program"
+S18 "expression_statement"
+S19 "array"
+S20 "identifier"
+S21 "empty_statement"
+
+[type_defs]
+T00 = <NoValue>
+T01 = <Node>
+T02 = Record  M00:1  ; { value }
+T03 = Record  M01:1  ; { inner }
+T04 = Record  M02:1  ; { middle }
+T05 = Record  M03:1  ; { shared }
+T06 = Variant M04:2  ; Some | None
+T07 = ListZeroOrMore(T06)  ; Choices*
+T08 = Record  M06:1  ; { rows }
+T09 = Record  M07:1  ; { value }
+T10 = Record  M08:1  ; { inner }
+T11 = Record  M09:1  ; { value }
+T12 = Record  M10:1  ; { inner }
+T13 = Record  M11:1  ; { middle }
+T14 = Record  M12:1  ; { value }
+T15 = Record  M13:1  ; { inner }
+T16 = Record  M14:1  ; { middle }
+T17 = Record  M15:1  ; { shared }
+T18 = Variant M16:2  ; Some | None
+
+[type_members]
+M00: S01 → T01  ; value: <Node>
+M01: S02 → T02  ; inner: LocalLeaf
+M02: S03 → T03  ; middle: LocalMiddle
+M03: S04 → T04  ; shared: Shared
+M04: S05 → T05  ; Some: T05
+M05: S06 → T00  ; None: <NoValue>
+M06: S07 → T07  ; rows: T07
+M07: S01 → T01  ; value: <Node>
+M08: S02 → T09  ; inner: FinalLeaf
+M09: S01 → T01  ; value: <Node>
+M10: S02 → T11  ; inner: MidLeaf
+M11: S03 → T12  ; middle: Middle
+M12: S01 → T01  ; value: <Node>
+M13: S02 → T14  ; inner: ChoiceLeaf
+M14: S03 → T15  ; middle: Middle
+M15: S04 → T16  ; shared: Shared
+M16: S05 → T17  ; Some: T17
+M17: S06 → T00  ; None: <NoValue>
+
+[type_names]
+N00: S08 → T02  ; LocalLeaf
+N01: S09 → T03  ; LocalMiddle
+N02: S10 → T04  ; Shared
+N03: S11 → T06  ; Choices
+N04: S12 → T08  ; Q
+N05: S13 → T09  ; FinalLeaf
+N06: S14 → T10  ; Middle
+N07: S15 → T11  ; MidLeaf
+N08: S14 → T12  ; Middle
+N09: S10 → T13  ; Shared
+N10: S16 → T14  ; ChoiceLeaf
+N11: S14 → T15  ; Middle
+N12: S10 → T16  ; Shared
+N13: S11 → T18  ; Choices
+
+[entrypoints]
+Choices = 19 :: T18
+Middle  = 03 :: T10
+Q       = 00 :: T08
+Shared  = 09 :: T13
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  -ε-                                   54, 36      [ListOpen]
+
+Middle:
+  03   !   (array)                          04
+  04  └‣─  (identifier)                     06          [RecordOpen Node RecordSet(M7 value)]
+  06  ─‣┘  _                                08          [RecordClose RecordSet(M8 inner)]
+  08       return
+
+Shared:
+  09   !   (expression_statement)           10
+  10  └‣─  (array)                          12          [RecordOpen]
+  12  └‣─  (identifier)                     14          [RecordOpen Node RecordSet(M9 value)]
+  14  ─‣┘  _                                16          [RecordClose RecordSet(M10 inner)]
+  16  ─‣┘  _                                18          [RecordClose RecordSet(M11 middle)]
+  18       return
+
+Choices:
+  19   !   switch
+             (empty_statement)              30
+             (expression_statement)         61
+  20  └‣─  (identifier)                     22          [RecordOpen Node RecordSet(M0 value)]
+  22  ─‣┘  _                                24          [RecordClose RecordSet(M1 inner)]
+  24  ─‣┘  _                                40          [RecordClose RecordSet(M2 middle)]
+  26  └‣─  (identifier)                     28          [RecordOpen Node RecordSet(M12 value)]
+  28  ─‣┘  _                                32          [RecordClose RecordSet(M13 inner)]
+  30   !   (empty_statement)                56          [VariantOpen(M17 None) VariantClose]
+  32  ─‣┘  _                                56          [RecordClose RecordSet(M14 middle) RecordClose RecordSet(M15 shared) VariantClose]
+  35       return
+  36  -ε-                                   35          [ListClose RecordSet(M6 rows)]
+  38  ─‣┘  _                                35          [ListClose RecordSet(M6 rows)]
+  40  -ε-                                   52, 38      [RecordClose RecordSet(M3 shared) VariantClose ArrayPush]
+  43  └‣─  (array)                          20          [RecordOpen]
+  45   !   (expression_statement)           43          [VariantOpen(M4 Some) RecordOpen]
+  47  -ε-                                   45
+  48   !   (empty_statement)                52, 38      [VariantOpen(M5 None) VariantClose ArrayPush]
+  51   !   switch
+             (expression_statement)         47
+             (empty_statement)              48
+  52  ──!  _                                51, 52
+  54  └─!  _                                51, 52
+  56       return
+  57  └‣─  (array)                          26          [RecordOpen]
+  59   !   (expression_statement)           57          [VariantOpen(M16 Some) RecordOpen]
+  61  -ε-                                   59
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  -ε-                                   54, 36      [ListOpen]
+  54  └─!  _                                51, 52
+       ●   (expression_statement)
+  51   ●   switch (expression_statement)    47
+  47  -ε-                                   45
+  45   !   (expression_statement)           43          [VariantOpen(M4 Some) RecordOpen]
+       ●   (expression_statement)
+  43  └‣─  (array)                          20          [RecordOpen]
+       ●   (array)
+  20  └‣─  (identifier)                     22          [RecordOpen Node RecordSet(M0 value)]
+       ○   "["
+       ●   (identifier)
+  22  ─‣┘  _                                24          [RecordClose RecordSet(M1 inner)]
+       ●   (array)
+  24  ─‣┘  _                                40          [RecordClose RecordSet(M2 middle)]
+       ●   (expression_statement)
+  40  -ε-                                   52, 38      [RecordClose RecordSet(M3 shared) VariantClose ArrayPush]
+  52  ──!  _                                51, 52
+       ●   (empty_statement)
+  51   ●   switch (empty_statement)         48
+  48   !   (empty_statement)                52, 38      [VariantOpen(M5 None) VariantClose ArrayPush]
+       ●   (empty_statement)
+  52  ──!  _                                51, 52
+       ●   (expression_statement)
+  51   ●   switch (expression_statement)    47
+  47  -ε-                                   45
+  45   !   (expression_statement)           43          [VariantOpen(M4 Some) RecordOpen]
+       ●   (expression_statement)
+  43  └‣─  (array)                          20          [RecordOpen]
+       ●   (array)
+  20  └‣─  (identifier)                     22          [RecordOpen Node RecordSet(M0 value)]
+       ○   "["
+       ●   (identifier)
+  22  ─‣┘  _                                24          [RecordClose RecordSet(M1 inner)]
+       ●   (array)
+  24  ─‣┘  _                                40          [RecordClose RecordSet(M2 middle)]
+       ●   (expression_statement)
+  40  -ε-                                   52, 38      [RecordClose RecordSet(M3 shared) VariantClose ArrayPush]
+  52  ──!  _                                51, 52
+       ○   no candidate
+  40  ❮❮❮
+  38  ─‣┘  _                                35          [ListClose RecordSet(M6 rows)]
+       ●   (program)
+  35   ◀   return                           ◼

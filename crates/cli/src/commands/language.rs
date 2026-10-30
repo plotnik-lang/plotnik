@@ -113,7 +113,7 @@ impl LanguageOptions {
         self.load_selected(input)
     }
 
-    fn load_selected(&self, input: &str) -> Result<Artifacts, CliError> {
+    pub(super) fn load_selected(&self, input: &str) -> Result<Artifacts, CliError> {
         let selection = LanguageSelector::parse(input).map_err(CliError::fatal)?;
         let cache = cache_path(&self.cache_dir()?, &selection);
         if let Some(artifacts) = read_cache(&cache)? {

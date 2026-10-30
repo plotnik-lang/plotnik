@@ -190,7 +190,7 @@ Expr = [
 
 ```sh
 cargo run -- check query.ptk --lang javascript
-cargo run -- gen query.ptk --lang javascript --target rust
+cargo run -- gen queries/ --lang javascript
 cargo run -- dump query.ptk --lang javascript
 ```
 

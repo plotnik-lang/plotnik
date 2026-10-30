@@ -1,0 +1,150 @@
+Q = (program
+  .
+  (Piece) @piece
+  .
+  (expression_statement
+    (number) @tail :: text
+  )
+  .
+)
+--------------- INPUT (piece.ptk) ----------------
+Piece = [
+  Short: (expression_statement
+    (identifier) @first :: text
+  )
+  Long: {
+    (expression_statement
+      (identifier) @first :: text
+    )
+    .
+    (expression_statement
+      (identifier) @second :: text
+    )
+  }
+]
+---------------- INPUT (input.js) ----------------
+a; b; 7;
+--------------------- OUTPUT ---------------------
+{
+  "piece": {
+    "$data": {
+      "first": "a",
+      "second": "b"
+    },
+    "$tag": "Long"
+  },
+  "tail": "7"
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "first"
+S02 "second"
+S03 "Short"
+S04 "Long"
+S05 "piece"
+S06 "tail"
+S07 "Piece"
+S08 "Q"
+S09 "program"
+S10 "expression_statement"
+S11 "number"
+S12 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M0:1  ; { first }
+T2 = Record  M1:2  ; { first, second }
+T3 = Variant M3:2  ; Short | Long
+T4 = Record  M5:2  ; { piece, tail }
+
+[type_members]
+M0: S01 → T0  ; first: <Text>
+M1: S01 → T0  ; first: <Text>
+M2: S02 → T0  ; second: <Text>
+M3: S03 → T1  ; Short: T1
+M4: S04 → T2  ; Long: T2
+M5: S05 → T3  ; piece: Piece
+M6: S06 → T0  ; tail: <Text>
+
+[type_names]
+N0: S07 → T3  ; Piece
+N1: S08 → T4  ; Q
+
+[entrypoints]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01       (@26)                            26 : 02
+  02  ─•─  (expression_statement)           04          [RecordSet(M5 piece)]
+  04  └‣─  (number)                         06          [NodeText RecordSet(M6 tail)]
+  06  ─‣┘  _                                07
+  07  ─•┘  _                                08
+  08       return
+  09  └‣─  (identifier)                     11          [NodeText RecordSet(M1 first)]
+  11  ─‣┘  _                                15
+  12       return
+  13  └‣─  (identifier)                     16          [NodeText RecordSet(M0 first)]
+  15  ─•─  (expression_statement)           20
+  16  ─‣┘  _                                12          [VariantClose]
+  18  └•─  (expression_statement)           13          [VariantOpen(M3 Short)]
+  20  └‣─  (identifier)                     16          [NodeText RecordSet(M2 second)]
+  22  ...
+  23  ...
+  24  └•─  (expression_statement)           09          [VariantOpen(M4 Long)]
+  26  -ε-                                   18, 24
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01       (@26)                            26 : 02
+       ▶   (@26)
+
+@26:
+  26  -ε-                                   18, 24
+  18  └•─  (expression_statement)           13          [VariantOpen(M3 Short)]
+       ●   (expression_statement)
+  13  └‣─  (identifier)                     16          [NodeText RecordSet(M0 first)]
+       ●   (identifier)
+  16  ─‣┘  _                                12          [VariantClose]
+       ●   (expression_statement)
+  12   ◀   return                           02
+
+Q:
+  02  ─•─  (expression_statement)           04          [RecordSet(M5 piece)]
+       ●   (expression_statement)
+  04  └‣─  (number)                         06          [NodeText RecordSet(M6 tail)]
+       ○   (identifier)
+       ○   ";"
+       ○   no candidate
+  13  ❮❮❮
+  13  └‣─  (identifier)                     16          [NodeText RecordSet(M0 first)]
+       ○   ";"
+       ○   no candidate
+  26  ❮❮❮
+  24  └•─  (expression_statement)           09          [VariantOpen(M4 Long)]
+       ●   (expression_statement)
+  09  └‣─  (identifier)                     11          [NodeText RecordSet(M1 first)]
+       ●   (identifier)
+  11  ─‣┘  _                                15
+       ●   (expression_statement)
+  15  ─•─  (expression_statement)           20
+       ●   (expression_statement)
+  20  └‣─  (identifier)                     16          [NodeText RecordSet(M2 second)]
+       ●   (identifier)
+  16  ─‣┘  _                                12          [VariantClose]
+       ●   (expression_statement)
+  12   ◀   return                           02
+
+Q:
+  02  ─•─  (expression_statement)           04          [RecordSet(M5 piece)]
+       ●   (expression_statement)
+  04  └‣─  (number)                         06          [NodeText RecordSet(M6 tail)]
+       ●   (number)
+  06  ─‣┘  _                                07
+       ●   (expression_statement)
+  07  ─•┘  _                                08
+       ●   (program)
+  08   ◀   return                           ◼

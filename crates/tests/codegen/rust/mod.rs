@@ -153,20 +153,40 @@ fn stage(root: &Path, cases: &[RustCase<'_>]) -> Result<(), String> {
                 case.case.relative
             )
         })?;
-        let (matcher, match_only) = generate::source(case.case)?;
-        fs::write(directory.join("matcher.rs"), matcher.as_bytes())
-            .map_err(|error| format!("write matcher for `{}`: {error}", case.case.relative))?;
+        let generated = generate::source(case.case)?;
+        let mut index = String::new();
+        for file in &generated.files {
+            let path = directory.join("queries").join(&file.path);
+            fs::write(&path, file.source.as_bytes())
+                .map_err(|error| format!("write {}: {error}", path.display()))?;
+            let relative = file
+                .path
+                .to_str()
+                .expect("corpus query filenames are UTF-8");
+            let _ = writeln!(
+                index,
+                "#[path = {relative:?}]\npub mod {};",
+                file.module_name
+            );
+        }
+        let _ = writeln!(index, "\npub use {}::Q;", generated.entry_module);
+        fs::write(directory.join("queries/mod.rs"), index)
+            .map_err(|error| format!("write module index for `{}`: {error}", case.case.relative))?;
         shards
             .entry(&case.shard)
             .or_default()
-            .push((case, match_only));
+            .push((case, generated.match_only));
     }
 
+    let mut rustfmt = Command::new("rustfmt");
+    rustfmt.args(["--edition", "2024"]);
     for (shard, cases) in shards {
         let source = render_shard(&cases);
-        fs::write(root.join(format!("{shard}.rs")), source)
-            .map_err(|error| format!("write Rust shard `{shard}`: {error}"))?;
+        let path = root.join(format!("{shard}.rs"));
+        fs::write(&path, source).map_err(|error| format!("write Rust shard `{shard}`: {error}"))?;
+        rustfmt.arg(path);
     }
+    process::capture(&mut rustfmt, "format generated Rust modules")?;
     Ok(())
 }
 
@@ -190,7 +210,7 @@ fn render_shard(cases: &[(&RustCase<'_>, bool)]) -> String {
         let module = format!("matcher_{index:03}");
         let _ = writeln!(
             out,
-            "#[path = \"generated/{relative}/matcher.rs\"]\npub mod {module};"
+            "#[path = \"generated/{relative}/queries/mod.rs\"]\npub mod {module};"
         );
     }
     out.push('\n');

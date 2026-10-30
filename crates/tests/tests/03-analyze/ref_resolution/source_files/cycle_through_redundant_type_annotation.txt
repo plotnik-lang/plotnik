@@ -1,0 +1,34 @@
+Q = (B)
+BEntries = (identifier) @value :: text
+----------------- INPUT (b.ptk) ------------------
+B = (program
+  {
+    (identifier) @value :: text
+  }* @entries :: BEntries
+)
+------------------ DIAGNOSTICS -------------------
+error: source files form a dependency cycle
+ --> query.ptk:1:6
+  |
+1 | Q = (B)
+  |      ^
+  |      |
+  |      Q references B in another source file
+  |
+ ::: b.ptk:4:18
+  |
+4 |   }* @entries :: BEntries
+  |                  -------- result type is owned by another source file (completing file cycle)
+  |
+help: move mutually dependent definitions and result types into the same source file, or remove a cross-file dependency
+
+warning: this capture already has type `BEntries`. Naming it `BEntries` has no effect
+ --> b.ptk:4:18
+  |
+4 |   }* @entries :: BEntries
+  |                  ^^^^^^^^
+------------------ DEFINITIONS -------------------
+Q
+  B
+BEntries
+B

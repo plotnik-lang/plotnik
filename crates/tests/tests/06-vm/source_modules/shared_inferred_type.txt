@@ -1,0 +1,124 @@
+Q = (B) @result
+----------------- INPUT (b.ptk) ------------------
+B = (program
+  (expression_statement
+    (identifier) @value :: text
+  )* @entries
+)
+-------------- INPUT (entries.ptk) ---------------
+BEntries = (identifier) @value :: text
+---------------- INPUT (input.js) ----------------
+alpha; beta;
+--------------------- OUTPUT ---------------------
+{
+  "result": {
+    "entries": [
+      {
+        "value": "alpha"
+      },
+      {
+        "value": "beta"
+      }
+    ]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "value"
+S2 "entries"
+S3 "result"
+S4 "BEntries"
+S5 "B"
+S6 "Q"
+S7 "program"
+S8 "expression_statement"
+S9 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M0:1  ; { value }
+T2 = ListZeroOrMore(T1)  ; BEntries*
+T3 = Record  M1:1  ; { entries }
+T4 = Record  M2:1  ; { result }
+T5 = Record  M3:1  ; { value }
+
+[type_members]
+M0: S1 → T0  ; value: <Text>
+M1: S2 → T2  ; entries: T2
+M2: S3 → T3  ; result: B
+M3: S1 → T0  ; value: <Text>
+
+[type_names]
+N0: S4 → T1  ; BEntries
+N1: S5 → T3  ; B
+N2: S6 → T4  ; Q
+N3: S4 → T5  ; BEntries
+
+[entrypoints]
+B        = 00 :: T3
+BEntries = 09 :: T5
+Q        = 03 :: T4
+
+[instructions]
+B:
+  00   !   (program)                        01
+  01  -ε-                                   24, 16      [ListOpen]
+
+Q:
+  03  -ε-                                   05          [RecordOpen]
+  05   !   (B)                              00 : 06
+  06  -ε-                                   08          [RecordClose RecordSet(M2 result)]
+  08       return
+
+BEntries:
+  09   !   (identifier)                     11          [NodeText RecordSet(M3 value)]
+  11       return
+  12  └‣─  (identifier)                     14          [NodeText RecordSet(M0 value)]
+  14  ─‣┘  _                                18
+  15       return
+  16  -ε-                                   15          [ListClose RecordSet(M1 entries)]
+  18  -ε-                                   22, 26      [RecordClose ArrayPush]
+  20   !   (expression_statement)           12          [RecordOpen]
+  22  ──!  _                                20, 22
+  24  └─!  _                                20, 22
+  26  ─‣┘  _                                15          [ListClose RecordSet(M1 entries)]
+--------------------- TRACE ----------------------
+Q:
+  03  -ε-                                   05          [RecordOpen]
+  05   !   (B)                              00 : 06
+       ●   (program)
+       ▶   (B)
+
+B:
+  00   !   (program)                        01
+       ●   (program)
+  01  -ε-                                   24, 16      [ListOpen]
+  24  └─!  _                                20, 22
+       ●   (expression_statement)
+  20   !   (expression_statement)           12          [RecordOpen]
+       ●   (expression_statement)
+  12  └‣─  (identifier)                     14          [NodeText RecordSet(M0 value)]
+       ●   (identifier)
+  14  ─‣┘  _                                18
+       ●   (expression_statement)
+  18  -ε-                                   22, 26      [RecordClose ArrayPush]
+  22  ──!  _                                20, 22
+       ●   (expression_statement)
+  20   !   (expression_statement)           12          [RecordOpen]
+       ●   (expression_statement)
+  12  └‣─  (identifier)                     14          [NodeText RecordSet(M0 value)]
+       ●   (identifier)
+  14  ─‣┘  _                                18
+       ●   (expression_statement)
+  18  -ε-                                   22, 26      [RecordClose ArrayPush]
+  22  ──!  _                                20, 22
+       ○   no candidate
+  18  ❮❮❮
+  26  ─‣┘  _                                15          [ListClose RecordSet(M1 entries)]
+       ●   (program)
+  15   ◀   return                           06
+
+Q:
+  06  -ε-                                   08          [RecordClose RecordSet(M2 result)]
+  08   ◀   return                           ◼

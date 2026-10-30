@@ -20,8 +20,8 @@ pub use crate::compiler::diagnostics::{
 };
 pub use emit::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, Emission,
-    EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,
-    journal_fn_name,
+    EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustSourceOutput,
+    RustTypesOutput,
 };
 pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{InputKind, QueryToken, parse_input_kind, tokenize};

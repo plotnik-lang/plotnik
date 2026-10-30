@@ -1,6 +1,7 @@
 mod capture;
 mod entrypoints;
 mod naming;
+mod public_types;
 pub mod type_analysis;
 pub mod type_check;
 mod type_description;

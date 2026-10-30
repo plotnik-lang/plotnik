@@ -76,11 +76,27 @@ impl From<PortId> for usize {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Frame {
+pub struct Frame<T = u16> {
     /// Immutable executor-owned token identifying the call's return map.
-    pub call_site: u16,
+    pub call_site: T,
     /// Parent frame index (for cactus stack).
     pub parent: Option<u32>,
+}
+
+/// The diagnostic identity and checkpoint continuation for an executor's call tokens.
+#[doc(hidden)]
+pub trait CallToken: Copy {
+    type Resume;
+
+    fn diagnostic_site(self) -> u16;
+}
+
+impl CallToken for u16 {
+    type Resume = crate::VmResume;
+
+    fn diagnostic_site(self) -> u16 {
+        self
+    }
 }
 
 /// A source-driven call could not be represented by the runtime's frame state.
@@ -126,12 +142,12 @@ impl std::error::Error for CallFrameError {}
 /// Popping moves the current pointer. Pruning removes frames no active
 /// checkpoint can restore.
 #[derive(Debug)]
-pub struct FrameArena {
-    frames: Vec<Frame>,
+pub struct FrameArena<T = u16> {
+    frames: Vec<Frame<T>>,
     current: Option<u32>,
 }
 
-impl FrameArena {
+impl<T: CallToken> FrameArena<T> {
     pub fn new() -> Self {
         Self {
             frames: Vec::new(),
@@ -146,9 +162,9 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, call_site: u16) -> Result<u32, CallFrameError> {
+    pub fn push(&mut self, call_site: T) -> Result<u32, CallFrameError> {
         let idx = u32::try_from(self.frames.len()).map_err(|_| CallFrameError::ArenaCapacity {
-            call_site,
+            call_site: call_site.diagnostic_site(),
             existing_frames: self.frames.len(),
         })?;
         self.frames.push(Frame {
@@ -162,11 +178,17 @@ impl FrameArena {
     /// Pop the current frame, returning its executor-owned call-site token.
     ///
     /// Panics if the stack is empty.
-    pub fn pop(&mut self) -> u16 {
+    pub fn pop(&mut self) -> T {
         let current_idx = self.current.expect("pop on empty frame stack");
         let frame = self.frames[current_idx as usize];
         self.current = frame.parent;
         frame.call_site
+    }
+
+    #[inline]
+    pub fn current_call(&self) -> Option<T> {
+        self.current
+            .map(|index| self.frames[index as usize].call_site)
     }
 
     /// Restore frame state for backtracking.
@@ -190,7 +212,7 @@ impl FrameArena {
     /// Occupied frame bytes, excluding spare arena capacity.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {
-        (self.frames.len() * std::mem::size_of::<Frame>()) as u64
+        (self.frames.len() * std::mem::size_of::<Frame<T>>()) as u64
     }
 
     #[inline]
@@ -236,7 +258,7 @@ impl FrameArena {
     }
 }
 
-impl Default for FrameArena {
+impl<T: CallToken> Default for FrameArena<T> {
     fn default() -> Self {
         Self::new()
     }

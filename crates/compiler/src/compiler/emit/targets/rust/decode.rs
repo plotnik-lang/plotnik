@@ -107,7 +107,12 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     }
 
     fn decoder_call(&self, name: Symbol) -> String {
-        let decoder = self.decoder_fn(name);
+        let path = self.model.item_path(name);
+        let ident = self.model.item_ident(name);
+        let prefix = path
+            .strip_suffix(ident)
+            .expect("item path ends in its identifier");
+        let decoder = format!("{prefix}{}", self.decoder_fn(name));
         let item = self.item_named(name);
         if item.fallible {
             format!("{decoder}(decoder, depth)?")
@@ -148,14 +153,14 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         };
         let application_generics = if item.has_decoder() { "" } else { "<'t>" };
         let (node_type, engine_type) = if sig.usage.tree || !item.has_decoder() {
-            ("rt::Node<'t>", "rt::Engine<'t>")
+            ("rt::Node<'t>", "rt::MatcherEngine<'t>")
         } else {
-            ("rt::Node<'_>", "rt::Engine<'_>")
+            ("rt::Node<'_>", "rt::MatcherEngine<'_>")
         };
         let engine_constructor = if item.has_decoder() {
-            "rt::Engine::new"
+            "rt::MatcherEngine::new"
         } else {
-            "rt::Engine::new_match_only"
+            "rt::MatcherEngine::new_match_only"
         };
         let source_ref = if sig.usage.source { "&'s str" } else { "&str" };
         let scratch_arg = if item.has_decoder() {
@@ -180,11 +185,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "    ) -> ::core::result::Result<::core::option::Option<{result_type}>, rt::LimitExceeded> {{"
         );
+        let _ = writeln!(out, "        matcher::GRAMMAR.verify(node);");
         let _ = writeln!(
             out,
             "        let mut eng = {engine_constructor}(node.walk());"
         );
-        let _ = writeln!(out, "        matcher::verify_language(node);");
         if item.has_decoder() {
             let _ = writeln!(
                 out,
@@ -219,7 +224,6 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        let mut eng = {engine_constructor}(scope.walk());"
         );
-        let _ = writeln!(out, "        let mut verified = false;");
         if item.has_decoder() {
             let _ = writeln!(
                 out,
@@ -230,11 +234,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             out,
             "        rt::Traversal::new(scope, move |node: rt::Node<'t>| {{"
         );
-        let _ = writeln!(out, "            if !verified {{");
-        let _ = writeln!(out, "                matcher::verify_language(node);");
-        let _ = writeln!(out, "                verified = true;");
-        let _ = writeln!(out, "            }}");
-        let _ = writeln!(out);
+        let _ = writeln!(out, "            matcher::GRAMMAR.verify(node);");
         let _ = writeln!(out, "            eng.reset(node);");
         let _ = writeln!(
             out,
@@ -352,6 +352,14 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     pub(super) fn decoders(&self) -> String {
         let mut out = String::new();
         for item in self.decode.items() {
+            if self
+                .model
+                .source()
+                .is_some_and(|source| self.model.item_source(item.name) != source)
+            {
+                continue;
+            }
+
             match &item.kind {
                 DecodeItemKind::Record(scope) => self.record_decoder(&mut out, item, scope),
                 DecodeItemKind::Variant(cases) => self.variant_decoder(&mut out, item, cases),
@@ -378,14 +386,19 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         let _ = writeln!(out, "/// Decode one committed `{ident}` value.");
         let mut params = vec![format!("decoder: &mut rt::ResultDecoder{decoder_generics}")];
         params.extend(depth_param.map(str::to_string));
+        let visibility = if self.model.source().is_some() {
+            "pub(super) "
+        } else {
+            ""
+        };
         let compact = format!(
-            "fn {decoder_fn}{fn_generics}({}) -> {return_type} {{",
+            "{visibility}fn {decoder_fn}{fn_generics}({}) -> {return_type} {{",
             params.join(", ")
         );
         if compact.len() <= 100 {
             let _ = writeln!(out, "{compact}");
         } else {
-            let _ = writeln!(out, "fn {decoder_fn}{fn_generics}(");
+            let _ = writeln!(out, "{visibility}fn {decoder_fn}{fn_generics}(");
             for param in params {
                 let _ = writeln!(out, "    {param},");
             }
@@ -465,6 +478,27 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
 
     fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &DecodeScope) {
         let p = indentation(scope.level());
+        if let [field] = plan.fields.as_slice() {
+            // Each accepting path produces this field exactly once, including
+            // completion values for absent alternatives. With no other field
+            // to dispatch, consume the value before validating its RecordSet.
+            let expr = self.value_expr(&field.value, scope.context);
+            let _ = writeln!(out, "{p}let v0 = {expr};");
+            let _ = writeln!(out, "{p}match decoder.expect_record_set() {{");
+            let indices = arm_pattern(&field.indices);
+            let _ = writeln!(out, "{p}    {indices} => {{}},");
+            unreachable_arm(
+                out,
+                &format!("{p}    "),
+                &format!(
+                    "journal shape proven at emit: `{}` has no member index {{other}}",
+                    scope.name
+                ),
+            );
+            let _ = writeln!(out, "{p}}}");
+            return;
+        }
+
         for (index, field) in plan.fields.iter().enumerate() {
             let _ = writeln!(
                 out,
@@ -515,6 +549,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
             let _ = writeln!(out, "{p}{head} {{");
         }
         for (index, (field, field_ident)) in plan.fields.iter().zip(&field_idents).enumerate() {
+            if plan.fields.len() == 1 {
+                let _ = writeln!(out, "{p}    {field_ident}: v{index},");
+                continue;
+            }
+
             let name = self.interner.resolve(field.name);
             let compact = format!(
                 "{p}    {field_ident}: v{index}.expect(\"field-stability: every accepting path sets `{name}`\"),"

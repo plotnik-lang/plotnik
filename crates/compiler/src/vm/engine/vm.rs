@@ -3,14 +3,14 @@ use tree_sitter::Node;
 use crate::bytecode::{
     CodeAddr, DecodedAction, DecodedCall, DecodedCandidate, DecodedInstr, DecodedMatch,
     DecodedPredicate, Effect, EffectKind, EntryBoundary, Entrypoint, Module, Nav, PredicateOp,
-    TypeDefKind, TypeKind,
+    SuccessorAddr, TypeDefKind, TypeKind,
 };
 
 use crate::core::{Colors, NodeFieldId};
 
 use plotnik_runtime::{
-    CallResume, Checkpoint, Engine, JournalEvent, LimitExceeded, MatchJournal, PortId, Resume,
-    SkipPolicy, Traversal,
+    CallResume, Checkpoint, JournalEvent, LimitExceeded, MatchJournal, PortId, Resume, SkipPolicy,
+    Traversal, VmEngine, VmResume,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
@@ -19,6 +19,12 @@ use super::trace::{NoopTracer, Tracer};
 use super::value::{NodeValue, Value, node_text};
 
 const BINARY_SEARCH_MIN_CASES: usize = 48;
+
+impl From<SuccessorAddr> for VmResume {
+    fn from(address: SuccessorAddr) -> Self {
+        Self::from(u16::from(address))
+    }
+}
 
 /// Resource usage observed during one VM run.
 #[derive(Debug, Clone, Copy, serde::Serialize)]
@@ -33,7 +39,7 @@ trait StatsObserver: Default {
     type Report;
 
     fn observe_heap(&mut self, used: u64);
-    fn sample_heap(&mut self, engine: &Engine<'_>);
+    fn sample_heap(&mut self, engine: &VmEngine<'_>);
     fn finish(self) -> Self::Report;
 }
 
@@ -46,7 +52,7 @@ impl StatsObserver for NoStats {
 
     fn observe_heap(&mut self, _used: u64) {}
 
-    fn sample_heap(&mut self, _engine: &Engine<'_>) {}
+    fn sample_heap(&mut self, _engine: &VmEngine<'_>) {}
 
     fn finish(self) {}
 }
@@ -65,7 +71,7 @@ impl StatsObserver for CollectStats {
         self.peak_live_heap_bytes = self.peak_live_heap_bytes.max(used);
     }
 
-    fn sample_heap(&mut self, engine: &Engine<'_>) {
+    fn sample_heap(&mut self, engine: &VmEngine<'_>) {
         self.sample_work += 1;
         if self.sample_work < 1024 {
             return;
@@ -84,7 +90,7 @@ impl StatsObserver for CollectStats {
 
 /// Virtual machine state for query execution.
 pub struct VM<'s, 't> {
-    pub(crate) engine: Engine<'t>,
+    pub(crate) engine: VmEngine<'t>,
     pub(crate) ip: CodeAddr,
 
     pub(crate) source: &'s str,
@@ -159,7 +165,7 @@ impl<'s, 't> VM<'s, 't> {
     /// Start at a supplied node. Matching cannot leave this node's subtree.
     pub fn new(source: &'s str, node: Node<'t>) -> Self {
         VM {
-            engine: Engine::new(node.walk()),
+            engine: VmEngine::new(node.walk()),
             ip: CodeAddr::ZERO,
             source,
         }
@@ -474,7 +480,7 @@ impl<'s, 't> VM<'s, 't> {
         policy: SkipPolicy,
         tracer: &mut T,
     ) {
-        if !m.nav.is_sibling_search() || !policy.admits(&self.engine.node()) {
+        if !m.nav.is_sibling_search() || !policy.admits(|| self.engine.node()) {
             return;
         }
 
@@ -770,17 +776,17 @@ impl<'s, 't> VM<'s, 't> {
             }
             self.engine.restore_checkpoint_state(cp.state, snapshot);
 
-            match cp.resume {
+            match cp.resume.resume {
                 Resume::Successor => {
-                    self.ip = CodeAddr::from(cp.ip);
+                    self.ip = CodeAddr::from(cp.resume.ip);
                     return ControlFlow::Backtracked.into();
                 }
 
                 Resume::Call(resume) => {
                     if T::ENABLED {
                         tracer.trace_instruction(
-                            CodeAddr::from(cp.ip),
-                            &module.decode_instruction(CodeAddr::from(cp.ip)),
+                            CodeAddr::from(cp.resume.ip),
+                            &module.decode_instruction(CodeAddr::from(cp.resume.ip)),
                         );
                     }
                     if !self.engine.cursor_mut().continue_search(resume.policy) {
@@ -828,10 +834,10 @@ impl<'s, 't> VM<'s, 't> {
                             self.engine.cursor().field_id(),
                         );
                     }
-                    let retry = self.call_retry_checkpoint(CodeAddr::from(cp.ip), resume);
+                    let retry = self.call_retry_checkpoint(CodeAddr::from(cp.resume.ip), resume);
                     self.engine.push_checkpoint(retry);
                     if T::ENABLED {
-                        tracer.trace_checkpoint_created(CodeAddr::from(cp.ip));
+                        tracer.trace_checkpoint_created(CodeAddr::from(cp.resume.ip));
                     }
                     if let Err(error) = self.enter_callee(
                         CodeAddr::from(resume.target),
@@ -844,15 +850,16 @@ impl<'s, 't> VM<'s, 't> {
                 }
 
                 Resume::Match => {
-                    let DecodedInstr::Match(m) =
-                        module.decoded().instruction_at(CodeAddr::from(cp.ip))
+                    let DecodedInstr::Match(m) = module
+                        .decoded()
+                        .instruction_at(CodeAddr::from(cp.resume.ip))
                     else {
                         unreachable!("match-retry checkpoint ip must address a Match");
                     };
                     if T::ENABLED {
                         tracer.trace_instruction(
-                            CodeAddr::from(cp.ip),
-                            &module.decode_instruction(CodeAddr::from(cp.ip)),
+                            CodeAddr::from(cp.resume.ip),
+                            &module.decode_instruction(CodeAddr::from(cp.resume.ip)),
                         );
                     }
                     let policy = m.nav.skip_policy();
@@ -894,7 +901,7 @@ impl<'s, 't> VM<'s, 't> {
                         tracer.trace_field_success(field_id);
                     }
 
-                    self.ip = CodeAddr::from(cp.ip);
+                    self.ip = CodeAddr::from(cp.resume.ip);
                     self.push_match_retry_if_resumable(m, policy, tracer);
                     return match self.finish_match(m, module, tracer) {
                         Ok(()) => ControlFlow::Backtracked.into(),

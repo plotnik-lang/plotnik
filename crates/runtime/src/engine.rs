@@ -2,19 +2,23 @@ use std::num::NonZeroU64;
 
 use tree_sitter::{Node, TreeCursor};
 
+use crate::frame::CallToken;
 use crate::{
     CallFrameError, Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, FrameArena,
     JournalEvent, MatchJournal,
 };
 
+/// Bytecode VM execution state with code-address call tokens and VM retry checkpoints.
+pub type VmEngine<'t> = Engine<'t, u16>;
+
 /// Execution state shared by the bytecode VM and generated matchers.
 ///
 /// Instruction pointers stay with the executor, which represents the current
 /// instruction differently (decoded code address vs. generated state id).
-pub struct Engine<'t> {
+pub struct Engine<'t, C: CallToken> {
     cursor: CursorWrapper<'t>,
-    frames: FrameArena,
-    checkpoints: CheckpointStack,
+    frames: FrameArena<C>,
+    checkpoints: CheckpointStack<C::Resume>,
     journal: MatchJournal<'t>,
     recursion_depth: u32,
     suppress_depth: u32,
@@ -23,7 +27,7 @@ pub struct Engine<'t> {
     snapshot_cursor_active: bool,
 }
 
-impl<'t> Engine<'t> {
+impl<'t, C: CallToken> Engine<'t, C> {
     /// Start an engine with a cursor rooted at the application node.
     /// See [`CursorWrapper`]'s shared-root invariant.
     pub fn new(cursor: TreeCursor<'t>) -> Self {
@@ -210,7 +214,7 @@ impl<'t> Engine<'t> {
 
     /// Push one checkpoint, pairing it with a pooled cursor snapshot once the
     /// snapshot pool has activated.
-    pub fn push_checkpoint(&mut self, checkpoint: Checkpoint) {
+    pub fn push_checkpoint(&mut self, checkpoint: Checkpoint<C::Resume>) {
         if self.snapshot_cursor_active {
             let snapshot = self.cursor_snapshot(1);
             self.checkpoints.push_with_snapshot(checkpoint, snapshot);
@@ -223,26 +227,29 @@ impl<'t> Engine<'t> {
     /// reverse so LIFO backtracking takes them in order. One state snapshot
     /// serves every push: nothing in the loop moves the cursor or touches the
     /// arenas the snapshot reads.
-    pub fn push_successors<A: Copy + Into<u16>>(&mut self, successors: &[A]) {
+    pub fn push_successors<A: Copy + Into<C::Resume>>(&mut self, successors: &[A]) {
+        if successors.is_empty() {
+            return;
+        }
         let state = self.checkpoint_state();
         if self.snapshot_cursor_active {
             let refs = u32::try_from(successors.len()).expect("successor count fits u32");
             let snapshot = self.cursor_snapshot(refs);
             for &successor in successors.iter().rev() {
                 self.checkpoints
-                    .push_with_snapshot(Checkpoint::successor(state, successor.into()), snapshot);
+                    .push_with_snapshot(Checkpoint::new(state, successor.into()), snapshot);
             }
         } else {
             for &successor in successors.iter().rev() {
                 self.checkpoints
-                    .push(Checkpoint::successor(state, successor.into()));
+                    .push(Checkpoint::new(state, successor.into()));
             }
         }
     }
 
     /// Pop the newest checkpoint (with its pooled snapshot, if any), or `None`
     /// when the stack is exhausted — no match.
-    pub fn pop_checkpoint(&mut self) -> Option<(Checkpoint, Option<NonZeroU64>)> {
+    pub fn pop_checkpoint(&mut self) -> Option<(Checkpoint<C::Resume>, Option<NonZeroU64>)> {
         if self.snapshot_cursor_active {
             self.checkpoints.pop_with_snapshot()
         } else {
@@ -258,12 +265,12 @@ impl<'t> Engine<'t> {
 
     /// Enter a callee, retaining the executor-owned token that identifies the
     /// call's return map.
-    pub fn enter_frame(&mut self, call_site: u16) -> Result<(), CallFrameError> {
+    pub fn enter_frame(&mut self, call_site: C) -> Result<(), CallFrameError> {
         let next_depth =
             self.recursion_depth
                 .checked_add(1)
                 .ok_or(CallFrameError::RecursionDepth {
-                    call_site,
+                    call_site: call_site.diagnostic_site(),
                     current_depth: self.recursion_depth,
                 })?;
         self.frames.push(call_site)?;
@@ -283,7 +290,7 @@ impl<'t> Engine<'t> {
     ///
     /// Panics if no frame is active; executors gate on [`Engine::frames_empty`]
     /// (an empty frame stack at Return means entrypoint acceptance).
-    pub fn exit_frame(&mut self) -> u16 {
+    pub fn exit_frame(&mut self) -> C {
         let call_site = self.frames.pop();
         self.recursion_depth = self
             .recursion_depth
@@ -301,6 +308,12 @@ impl<'t> Engine<'t> {
     #[inline]
     pub fn frames_empty(&self) -> bool {
         self.frames.is_empty()
+    }
+
+    /// The active callee's executor-owned call token, if any.
+    #[inline]
+    pub fn current_call(&self) -> Option<C> {
+        self.frames.current_call()
     }
 
     /// Open a suppression scope (bare-ref opacity). Returns whether output events

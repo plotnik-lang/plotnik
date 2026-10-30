@@ -615,6 +615,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     self.infer_pattern_discarded(&captured.wrap(inner));
                 }
             }
+
+            self.ctx
+                .type_ctx
+                .discard_result_origins_in(captured.span_of(captured_pattern.text_range()));
             return PatternShape::no_value();
         }
 
@@ -740,79 +744,50 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternShape::fields(field_flow)
     }
 
-    fn apply_custom_capture_type(
-        &mut self,
-        type_id: TypeId,
-        name: Symbol,
-        range: TextRange,
-    ) -> TypeId {
-        match self.ctx.type_ctx.in_progress().type_shape(type_id).cloned() {
-            Some(TypeShape::Record(_) | TypeShape::Variant(_)) => {
-                self.ctx
+    fn apply_custom_capture_type(&mut self, occurrence: CustomCaptureTypeOccurrence) -> TypeId {
+        let type_id = occurrence.type_id;
+        let shape = self
+            .ctx
+            .type_ctx
+            .in_progress()
+            .type_shape(type_id)
+            .cloned()
+            .expect("custom capture type must reference a registered type");
+        let declared = match shape {
+            TypeShape::Record(_) | TypeShape::Variant(_) | TypeShape::Ref(_) => type_id,
+            TypeShape::List { element, minimum } => {
+                let element = self.apply_custom_capture_type(CustomCaptureTypeOccurrence {
+                    type_id: element,
+                    ..occurrence
+                });
+                return self
+                    .ctx
                     .type_ctx
-                    .record_custom_capture_type(CustomCaptureTypeOccurrence {
-                        name,
-                        span: Span::new(self.source, range),
-                        type_id,
-                    });
-                type_id
+                    .intern_type(TypeShape::List { element, minimum });
             }
-            Some(TypeShape::List { element, minimum }) => {
-                let element = self.apply_custom_capture_type(element, name, range);
-                self.ctx
-                    .type_ctx
-                    .intern_type(TypeShape::List { element, minimum })
+            TypeShape::Option(inner) => {
+                let inner = self.apply_custom_capture_type(CustomCaptureTypeOccurrence {
+                    type_id: inner,
+                    ..occurrence
+                });
+                return self.ctx.type_ctx.intern_option(inner);
             }
-            Some(TypeShape::Option(inner)) => {
-                let inner = self.apply_custom_capture_type(inner, name, range);
-                self.ctx.type_ctx.intern_option(inner)
-            }
-            Some(TypeShape::Ref(_)) => {
-                self.ctx
-                    .type_ctx
-                    .record_custom_capture_type(CustomCaptureTypeOccurrence {
-                        name,
-                        span: Span::new(self.source, range),
-                        type_id,
-                    });
-                type_id
-            }
-            Some(TypeShape::Node) => {
-                if self.ctx.interner.resolve(name) == "Node" {
-                    self.ctx
-                        .type_ctx
-                        .record_custom_capture_type(CustomCaptureTypeOccurrence {
-                            name,
-                            span: Span::new(self.source, range),
-                            type_id,
-                        });
-                    return type_id;
-                }
-                let declared = self.ctx.type_ctx.declare_capture_type(name, TYPE_NODE);
-                self.ctx
-                    .type_ctx
-                    .record_custom_capture_type(CustomCaptureTypeOccurrence {
-                        name,
-                        span: Span::new(self.source, range),
-                        type_id: declared,
-                    });
-                declared
-            }
-            Some(TypeShape::Text | TypeShape::Bool) => {
+            TypeShape::Node if self.ctx.interner.resolve(occurrence.name) == "Node" => type_id,
+            TypeShape::Text | TypeShape::Bool => {
                 unreachable!("ordinary captures cannot produce text or boolean roots")
             }
-            _ => {
-                let declared = self.ctx.type_ctx.declare_capture_type(name, TYPE_NODE);
-                self.ctx
-                    .type_ctx
-                    .record_custom_capture_type(CustomCaptureTypeOccurrence {
-                        name,
-                        span: Span::new(self.source, range),
-                        type_id: declared,
-                    });
-                declared
-            }
-        }
+            TypeShape::Node => self
+                .ctx
+                .type_ctx
+                .declare_capture_type(occurrence.name, TYPE_NODE),
+        };
+        self.ctx
+            .type_ctx
+            .record_custom_capture_type(CustomCaptureTypeOccurrence {
+                type_id: declared,
+                ..occurrence
+            });
+        declared
     }
 
     fn resolve_capture_type(&mut self, capture: &Capture) -> ResolvedCaptureType {
@@ -866,8 +841,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         let field = match capture_type {
             ResolvedCaptureType::Custom(name, range) if inferred.valid => {
-                let final_type =
-                    self.apply_custom_capture_type(inferred.value.field.final_type, name, range);
+                let final_type = self.apply_custom_capture_type(CustomCaptureTypeOccurrence {
+                    name,
+                    span: Span::new(self.source, range),
+                    scope: Span::new(self.source, inferred.occurrence.text_range()),
+                    type_id: inferred.value.field.final_type,
+                });
                 RecordField::new(final_type)
             }
             ResolvedCaptureType::BuiltIn(_, _)

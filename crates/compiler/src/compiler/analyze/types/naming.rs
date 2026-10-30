@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::types::type_analysis::{
@@ -23,6 +23,7 @@ pub(crate) struct TypeNamer<'a, 'd> {
     custom_capture_types: HashMap<TypeId, CustomCaptureTypeOccurrence>,
     claims: HashMap<Symbol, Claim>,
     names: BTreeMap<TypeId, Symbol>,
+    redundant_capture_types: Vec<(Span, String)>,
 }
 
 impl<'a, 'd> TypeNamer<'a, 'd> {
@@ -43,6 +44,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             custom_capture_types,
             claims: HashMap::new(),
             names: BTreeMap::new(),
+            redundant_capture_types: Vec::new(),
         }
     }
 
@@ -57,6 +59,21 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         self.claim_expression_types(expression);
 
         self.ctx.set_named_types(self.names);
+        let diag = self.diag.expect("final naming has diagnostics");
+        let ownership_annotations = if diag.has_errors() {
+            HashSet::new()
+        } else {
+            self.ctx.resolve_public_types(definitions)
+        };
+        for (span, detail) in self.redundant_capture_types {
+            if ownership_annotations.contains(&span) {
+                continue;
+            }
+
+            diag.report(DiagnosticKind::RedundantCaptureType, span)
+                .detail(detail)
+                .emit();
+        }
     }
 
     fn claim_expression_types(&mut self, source: Option<crate::compiler::diagnostics::SourceId>) {
@@ -280,12 +297,11 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
     }
 
     fn warn_redundant_capture_type(&mut self, span: Span, detail: &str) {
-        let Some(diag) = self.diag.as_deref_mut() else {
+        if self.diag.is_none() {
             return;
-        };
-        diag.report(DiagnosticKind::RedundantCaptureType, span)
-            .detail(detail)
-            .emit();
+        }
+
+        self.redundant_capture_types.push((span, detail.to_owned()));
     }
 
     fn unwrap_wrappers(&self, type_id: TypeId) -> TypeId {
@@ -372,6 +388,7 @@ impl<'a> RawTypeNameValidator<'a> {
             custom_capture_types,
             claims: HashMap::new(),
             names: BTreeMap::new(),
+            redundant_capture_types: Vec::new(),
         };
         validator.reserve_builtins();
         validator.claim_definitions(definitions);

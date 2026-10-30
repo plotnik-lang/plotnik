@@ -42,19 +42,30 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
     fn render_sections(&mut self) -> Vec<String> {
         let mut sections: Vec<String> = Vec::new();
-        for item in self.model.items().to_vec() {
-            sections.push(self.render_item(&item));
+        let items: Vec<_> = self
+            .model
+            .items()
+            .iter()
+            .copied()
+            .filter(|item| {
+                self.model
+                    .source()
+                    .is_none_or(|source| self.model.item_source(item.name) == source)
+            })
+            .collect();
+        for item in &items {
+            sections.push(self.render_item(item));
         }
 
         if !self.config.serde {
             return sections;
         }
 
-        for item in self.model.items().to_vec() {
+        for item in &items {
             if !item.is_composite() {
                 continue;
             }
-            sections.push(self.serde_impl(&item));
+            sections.push(self.serde_impl(item));
         }
         sections
     }
@@ -250,7 +261,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn named_type(&self, name: Symbol, ty: TypeId) -> String {
-        let ident = self.item_ident(name);
+        let ident = self.model.item_path(name);
         let lt = self.lifetime_args(ty);
         format!("{ident}{lt}")
     }

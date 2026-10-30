@@ -60,6 +60,7 @@ pub enum DiagnosticKind {
     UndefinedReference,
     MixedAlternativeLabels,
     DuplicateAlternativeLabel,
+    SourceDependencyCycle,
     RecursionWithoutEscape,
     RecursionWithoutProgress,
     GrammarFieldSequenceValue,
@@ -353,6 +354,7 @@ impl DiagnosticKind {
                 "an alternation cannot mix labeled and unlabeled alternatives"
             }
             Self::DuplicateAlternativeLabel => "duplicate alternative label",
+            Self::SourceDependencyCycle => "source files form a dependency cycle",
             Self::RecursionWithoutEscape => "infinite recursion: no escape path",
             Self::RecursionWithoutProgress => "infinite recursion: cycle makes no progress",
             Self::GrammarFieldSequenceValue => "grammar field cannot match a sequence",

@@ -51,11 +51,8 @@ fn individual_selection_uses_loaded_name_and_metadata_only() {
     let file = root.path().join("query.ptk");
     fs::write(&file, QUERY).unwrap();
 
-    for command in ["check", "dump", "gen"] {
+    for command in ["check", "dump"] {
         let mut args = vec![command, file.to_str().unwrap(), "--lang", "test_lang"];
-        if command == "gen" {
-            args.extend(["--target", "rust"]);
-        }
         let named = run(root.path(), &args);
         args[3] = "owner/repo@main";
         let explicit = run(root.path(), &args);
@@ -111,6 +108,9 @@ fn directories_compile_one_namespace_with_explicit_language() {
     fs::create_dir(&queries).unwrap();
     fs::write(queries.join("a.ptk"), "Name = (identifier) @text :: text").unwrap();
     fs::write(queries.join("foreign.ptk"), "// @other\nnot a valid module").unwrap();
+    fs::create_dir(queries.join("directory.ptk")).unwrap();
+    fs::create_dir(queries.join("nested")).unwrap();
+    fs::write(queries.join("nested/broken.ptk"), "invalid").unwrap();
     fs::write(
         queries.join("z.ptk"),
         "// @test_lang\nQ = (program (Name) @name)",
@@ -118,11 +118,8 @@ fn directories_compile_one_namespace_with_explicit_language() {
     .unwrap();
     let path = queries.to_str().unwrap();
 
-    for command in ["check", "dump", "gen"] {
-        let mut args = vec![command, path, "--lang", "test_lang"];
-        if command == "gen" {
-            args.extend(["--target", "rust"]);
-        }
+    for command in ["check", "dump"] {
+        let args = [command, path, "--lang", "test_lang"];
         let merged = run(root.path(), &args);
         assert_eq!(merged.status.code(), Some(0), "{merged:?}");
 
@@ -147,11 +144,8 @@ fn declaration_errors_are_located_and_missing_selection_is_usage_error() {
     let file = root.path().join("query.ptk");
     fs::write(&file, "// @bad/name\nQ = (program)").unwrap();
 
-    for command in ["check", "dump", "gen"] {
+    for command in ["check", "dump"] {
         let mut args = vec![command, file.to_str().unwrap()];
-        if command == "gen" {
-            args.extend(["--target", "rust"]);
-        }
         let missing = run(root.path(), &args);
         args.extend(["--lang", "test_lang"]);
         let malformed = run(root.path(), &args);
@@ -170,11 +164,8 @@ fn static_stdin_is_a_named_module() {
     let root = tempfile::tempdir().unwrap();
     cache(root.path(), "test_lang");
 
-    for command in ["check", "dump", "gen"] {
-        let mut args = vec![command, "-", "--lang", "test_lang"];
-        if command == "gen" {
-            args.extend(["--target", "rust"]);
-        }
+    for command in ["check", "dump"] {
+        let args = [command, "-", "--lang", "test_lang"];
         let module = stdin(
             root.path(),
             &args,
@@ -211,11 +202,8 @@ fn compiler_warnings_preserve_success_and_output_unless_check_is_strict() {
         "help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them\n",
     );
 
-    for command in ["check", "dump", "gen"] {
-        let mut args = vec![command, "-", "--lang", "test_lang"];
-        if command == "gen" {
-            args.extend(["--target", "rust"]);
-        }
+    for command in ["check", "dump"] {
+        let args = [command, "-", "--lang", "test_lang"];
         let normal = stdin(root.path(), &args, query);
         let unlabeled = stdin(
             root.path(),
@@ -229,20 +217,6 @@ fn compiler_warnings_preserve_success_and_output_unless_check_is_strict() {
         assert!(unlabeled.stderr.is_empty(), "{unlabeled:?}");
         assert_eq!(normal.stdout, unlabeled.stdout);
         assert_eq!(normal.stdout.is_empty(), command == "check");
-
-        if command == "gen" {
-            let output = root.path().join("matcher.rs");
-            args.extend(["--output", output.to_str().unwrap()]);
-            let saved = stdin(root.path(), &args, query);
-
-            assert_eq!(saved.status.code(), Some(0), "{saved:?}");
-            assert!(saved.stdout.is_empty(), "{saved:?}");
-            assert_eq!(fs::read(&output).unwrap(), normal.stdout);
-            assert_eq!(
-                String::from_utf8(saved.stderr).unwrap(),
-                format!("{expected}Wrote Rust matcher to {}\n", output.display())
-            );
-        }
     }
 
     let strict = stdin(
@@ -262,26 +236,22 @@ fn generation_errors_leave_existing_output_unchanged() {
     cache(root.path(), "test_lang");
     let query = root.path().join("invalid.ptk");
     fs::write(&query, "Q = (unknown)").unwrap();
-    let output = root.path().join("matcher.rs");
-    fs::write(&output, "existing matcher").unwrap();
+    let output = root.path().join("invalid.rs");
+    let existing_output = "// Generated. Do not edit.\nexisting matcher";
+    fs::write(&output, existing_output).unwrap();
+    let index = root.path().join("mod.rs");
+    let existing_index = "// Generated. Do not edit.\npub mod invalid;\n";
+    fs::write(&index, existing_index).unwrap();
 
     let invalid = run(
         root.path(),
-        &[
-            "gen",
-            query.to_str().unwrap(),
-            "--lang",
-            "test_lang",
-            "--target",
-            "rust",
-            "--output",
-            output.to_str().unwrap(),
-        ],
+        &["gen", root.path().to_str().unwrap(), "--lang", "test_lang"],
     );
 
     assert_eq!(invalid.status.code(), Some(1), "{invalid:?}");
     assert!(invalid.stdout.is_empty(), "{invalid:?}");
-    assert_eq!(fs::read_to_string(output).unwrap(), "existing matcher");
+    assert_eq!(fs::read_to_string(output).unwrap(), existing_output);
+    assert_eq!(fs::read_to_string(index).unwrap(), existing_index);
     assert_eq!(
         String::from_utf8(invalid.stderr).unwrap(),
         format!(

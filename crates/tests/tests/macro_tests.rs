@@ -95,6 +95,71 @@ mod skew {
     }
 }
 
+mod canonical {
+    plotnik::query! {
+        r#"
+        Q = (program {[Some: {(expression_statement {(array {(identifier) @value} @inner :: LocalLeaf)} @middle :: LocalMiddle)} @shared :: Shared None: (empty_statement)]* @rows :: Choices} @result)
+        Middle = (array {(identifier) @value} @inner :: FinalLeaf)
+        Shared = (expression_statement {(array {(identifier) @value} @inner :: MidLeaf)} @middle :: Middle)
+        Choices = [Some: {(expression_statement {(array {(identifier) @value} @inner :: ChoiceLeaf)} @middle :: Middle)} @shared :: Shared None: (empty_statement)]
+        "#,
+        grammar = "tree-sitter-javascript",
+    }
+}
+
+mod type_only {
+    plotnik::query! {
+        r#"
+        Pair = {(identifier) @first (identifier) @second}
+        Q = (program (expression_statement (array {(identifier) @first (identifier) @second} @pair :: Pair)))
+        "#,
+        grammar = "tree-sitter-javascript",
+    }
+}
+
+#[test]
+fn canonical_substitutions_compose_through_variant_lists() {
+    let source = "[x]; ; [yz];";
+    let tree = parse(&js(), source);
+
+    let value = canonical::Q::exec(tree.root_node(), source)
+        .unwrap()
+        .unwrap();
+    let json = serde_json::to_value(plotnik::rt::WithSource::new(&value, source)).unwrap();
+
+    assert_eq!(
+        json,
+        serde_json::json!({"result": {"rows": [
+            {"$tag": "Some", "$data": {"shared": {"middle": {"inner": {"value": {
+                "kind": "identifier", "span": [1, 2], "text": "x"
+            }}}}}},
+            {"$tag": "None"},
+            {"$tag": "Some", "$data": {"shared": {"middle": {"inner": {"value": {
+                "kind": "identifier", "span": [8, 10], "text": "yz"
+            }}}}}}
+        ]}})
+    );
+}
+
+#[test]
+fn canonical_type_owner_does_not_need_a_capture_scope() {
+    let source = "[alpha, beta];";
+    let tree = parse(&js(), source);
+
+    let value = type_only::Q::exec(tree.root_node(), source)
+        .unwrap()
+        .unwrap();
+    let json = serde_json::to_value(plotnik::rt::WithSource::new(&value, source)).unwrap();
+
+    assert_eq!(
+        json,
+        serde_json::json!({"pair": {
+            "first": {"kind": "identifier", "span": [1, 6], "text": "alpha"},
+            "second": {"kind": "identifier", "span": [8, 12], "text": "beta"}
+        }})
+    );
+}
+
 #[test]
 fn facade_executes_generated_types_from_multiple_expansions() {
     let source = "x;";

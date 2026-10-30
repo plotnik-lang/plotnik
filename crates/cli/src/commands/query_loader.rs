@@ -63,7 +63,7 @@ fn load_file(path: &Path) -> Result<QuerySources, CliError> {
     })
 }
 
-fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
+pub(super) fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
     let entries = fs::read_dir(dir).map_err(|error| {
         CliError::fatal(format!(
             "failed to read directory '{}': {error}",
@@ -79,9 +79,21 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
             ))
         })?;
         let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "ptk") {
-            paths.push(path);
+        if !path.extension().is_some_and(|ext| ext == "ptk") {
+            continue;
         }
+
+        let metadata = fs::metadata(&path).map_err(|error| {
+            CliError::fatal(format!(
+                "cannot inspect query file '{}': {error}",
+                path.display()
+            ))
+        })?;
+        if !metadata.is_file() {
+            continue;
+        }
+
+        paths.push(path);
     }
 
     paths.sort();
@@ -89,8 +101,10 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
     let mut sources = SourceMap::new();
     for path in paths {
         let content = read_file(&path)?;
-        let source_path = path.to_string_lossy();
-        sources.add_file(SourcePath::new(&source_path), &content);
+        let source_path = path
+            .to_str()
+            .ok_or_else(|| CliError::fatal("query paths must be UTF-8"))?;
+        sources.add_file(SourcePath::new(source_path), &content);
     }
 
     Ok(QuerySources {

@@ -29,6 +29,24 @@ impl CaptureProvenance {
         interner: &crate::core::Interner,
         diagnostics: &mut Diagnostics,
     ) {
+        let annotations = self
+            .captures
+            .iter()
+            .filter(|capture| matches!(capture.observation.intent, CaptureTypeIntent::Custom(_)))
+            .map(|capture| {
+                let syntax = capture.occurrence.node().capture();
+                let name = syntax
+                    .capture_type()
+                    .expect("custom capture retains its annotation")
+                    .name()
+                    .expect("custom capture annotation has a name");
+                let source = capture.occurrence.source();
+                (
+                    Span::new(source, syntax.text_range()),
+                    Span::new(source, name.text_range()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
         let mut field_flows = HashMap::new();
         for pattern in &pattern_order {
             let shape = types
@@ -36,6 +54,21 @@ impl CaptureProvenance {
                 .get_mut(pattern)
                 .expect("inference order references an inferred pattern");
             if let Some(field_flow) = shape.field_flow.take() {
+                for (&name, field) in &field_flow.fields {
+                    for source in &field.sources {
+                        let span = source.capture_span();
+                        let span = if let Some(&annotation) = annotations.get(&span) {
+                            annotation
+                        } else {
+                            span
+                        };
+                        types
+                            .field_origins
+                            .entry((field_flow.type_id, name, span.source))
+                            .or_default()
+                            .push(span);
+                    }
+                }
                 field_flows.insert(pattern.clone(), field_flow);
             }
         }
@@ -184,13 +217,31 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
             }
         }
 
-        let suppression_boundary_ids = deferred_diagnostics
+        let suppression_boundary_ids = self
+            .session
+            .input
+            .captures
             .iter()
-            .filter_map(|diagnostic| match diagnostic {
-                DeferredCaptureDiagnostic::SuppressedValue(request) => Some(request.capture_id),
-                DeferredCaptureDiagnostic::InvalidCaptureType { .. } => None,
+            .enumerate()
+            .filter_map(|(index, capture)| {
+                let pattern = Pattern::CapturedPattern(capture.occurrence.node().clone());
+                self.session
+                    .types
+                    .analysis
+                    .expect_capture_fact(&pattern)
+                    .built_in_plan()
+                    .filter(|(_, plan)| plan.suppresses_semantic_data())
+                    .map(|_| CaptureId::from_index(index))
             })
             .collect::<HashSet<_>>();
+        for &id in &suppression_boundary_ids {
+            let capture = self.session.input.capture(id);
+            if let Some(inner) = capture.occurrence.node().inner() {
+                self.session
+                    .types
+                    .discard_result_origins_in(capture.occurrence.span_of(inner.text_range()));
+            }
+        }
         for diagnostic in deferred_diagnostics {
             match diagnostic {
                 DeferredCaptureDiagnostic::InvalidCaptureType { span, reason } => {

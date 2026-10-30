@@ -28,6 +28,8 @@ mod execution;
 #[cfg(feature = "execution")]
 mod journal;
 #[cfg(feature = "execution")]
+mod matcher;
+#[cfg(feature = "execution")]
 mod result_decoder;
 #[cfg(feature = "serde")]
 mod serialize;
@@ -35,9 +37,11 @@ mod serialize;
 mod surface;
 
 pub use checkpoint::{
-    CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume,
+    CallResume, Checkpoint, CheckpointStack, CheckpointState, EffectDepths, Resume, VmResume,
 };
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
+#[doc(hidden)]
+pub use frame::CallToken;
 pub use frame::{CallFrameError, Frame, FrameArena, PortId};
 pub use ids::{InvalidNodeKindId, NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
@@ -49,12 +53,15 @@ pub use node_class::{NodeClass, SkipClass};
 #[cfg(feature = "execution")]
 pub use cursor::CursorWrapper;
 #[cfg(feature = "execution")]
-pub use engine::Engine;
+pub use engine::{Engine, VmEngine};
 #[cfg(feature = "execution")]
 #[doc(hidden)]
 pub use execution::Traversal;
 #[cfg(feature = "execution")]
 pub use journal::{JournalEvent, MatchJournal, OutputEvents, node_text, source_text};
+#[cfg(feature = "execution")]
+#[doc(hidden)]
+pub use matcher::{Call, EntryBoundary, Flow, Grammar, Matcher, MatcherEngine, Runner};
 #[cfg(feature = "execution")]
 pub use result_decoder::{DecoderScratch, ResultDecoder};
 #[cfg(feature = "serde")]

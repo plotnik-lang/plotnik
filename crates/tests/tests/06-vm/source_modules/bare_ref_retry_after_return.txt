@@ -1,0 +1,138 @@
+Q = (program
+  .
+  (Piece)
+  .
+  (expression_statement
+    (number) @tail :: text
+  )
+  .
+)
+--------------- INPUT (piece.ptk) ----------------
+Piece = [
+  Short: (expression_statement
+    (identifier) @first :: text
+  )
+  Long: {
+    (expression_statement
+      (identifier) @first :: text
+    )
+    .
+    (expression_statement
+      (identifier) @second :: text
+    )
+  }
+]
+---------------- INPUT (input.js) ----------------
+a; b; 7;
+--------------------- OUTPUT ---------------------
+{
+  "tail": "7"
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "first"
+S02 "second"
+S03 "Short"
+S04 "Long"
+S05 "tail"
+S06 "Piece"
+S07 "Q"
+S08 "program"
+S09 "expression_statement"
+S10 "number"
+S11 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Record  M0:1  ; { first }
+T2 = Record  M1:2  ; { first, second }
+T3 = Variant M3:2  ; Short | Long
+T4 = Record  M5:1  ; { tail }
+
+[type_members]
+M0: S01 → T0  ; first: <Text>
+M1: S01 → T0  ; first: <Text>
+M2: S02 → T0  ; second: <Text>
+M3: S03 → T1  ; Short: T1
+M4: S04 → T2  ; Long: T2
+M5: S05 → T0  ; tail: <Text>
+
+[type_names]
+N0: S06 → T3  ; Piece
+N1: S07 → T4  ; Q
+
+[entrypoints]
+Q = 00 :: T4
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01       (@16)                            16 : 02
+  02  ─•─  (expression_statement)           03
+  03  └‣─  (number)                         05          [NodeText RecordSet(M5 tail)]
+  05  ─‣┘  _                                06
+  06  ─•┘  _                                07
+  07       return
+  08  └‣─  (identifier)                     09
+  09  ─‣┘  _                                12
+  10  └‣─  (identifier)                     11
+  11  ─‣┘  _                                14
+  12       return
+  13  └•─  (expression_statement)           08
+  14  ─•─  (expression_statement)           08
+  15  └•─  (expression_statement)           10
+  16  -ε-                                   13, 15
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01       (@16)                            16 : 02
+       ▶   (@16)
+
+@16:
+  16  -ε-                                   13, 15
+  13  └•─  (expression_statement)           08
+       ●   (expression_statement)
+  08  └‣─  (identifier)                     09
+       ●   (identifier)
+  09  ─‣┘  _                                12
+       ●   (expression_statement)
+  12   ◀   return                           02
+
+Q:
+  02  ─•─  (expression_statement)           03
+       ●   (expression_statement)
+  03  └‣─  (number)                         05          [NodeText RecordSet(M5 tail)]
+       ○   (identifier)
+       ○   ";"
+       ○   no candidate
+  08  ❮❮❮
+  08  └‣─  (identifier)                     09
+       ○   ";"
+       ○   no candidate
+  16  ❮❮❮
+  15  └•─  (expression_statement)           10
+       ●   (expression_statement)
+  10  └‣─  (identifier)                     11
+       ●   (identifier)
+  11  ─‣┘  _                                14
+       ●   (expression_statement)
+  14  ─•─  (expression_statement)           08
+       ●   (expression_statement)
+  08  └‣─  (identifier)                     09
+       ●   (identifier)
+  09  ─‣┘  _                                12
+       ●   (expression_statement)
+  12   ◀   return                           02
+
+Q:
+  02  ─•─  (expression_statement)           03
+       ●   (expression_statement)
+  03  └‣─  (number)                         05          [NodeText RecordSet(M5 tail)]
+       ●   (number)
+  05  ─‣┘  _                                06
+       ●   (expression_statement)
+  06  ─•┘  _                                07
+       ●   (program)
+  07   ◀   return                           ◼

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
@@ -78,7 +77,6 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
 
     let query_span = query.span;
     let compiled = compile_query(query, &loaded_grammar.grammar)?;
-    reject_colliding_entry_names(&compiled, query_span)?;
 
     let config = RustCodegenConfig::new()
         .runtime_crate("::plotnik::rt")
@@ -116,24 +114,6 @@ fn compile_query(
     }
 
     Ok(compiled)
-}
-
-fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<(), ExpandError> {
-    let mut entry_names: HashMap<String, String> = HashMap::new();
-    for def in compiled.entrypoint_names() {
-        let entry = plotnik_compiler::matcher_journal_fn_name(&def);
-        if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
-            return Err(ExpandError::new(
-                span,
-                format!(
-                    "definitions `{previous}` and `{def}` collide in generated code: \
-                     both would be spelled `{entry}`; rename one so their snake_case \
-                     forms differ"
-                ),
-            ));
-        }
-    }
-    Ok(())
 }
 
 fn load_query_input(

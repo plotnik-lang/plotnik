@@ -29,11 +29,14 @@ pub enum SkipClass {
 }
 
 impl SkipClass {
-    pub fn admits(self, node: NodeClass) -> bool {
+    pub fn admits(self, node: impl FnOnce() -> NodeClass) -> bool {
         match self {
             Self::Any => true,
-            Self::Trivia => node.anonymous || node.extra,
-            Self::Extras => node.extra,
+            Self::Trivia => {
+                let node = node();
+                node.anonymous || node.extra
+            }
+            Self::Extras => node().extra,
             Self::Exact => false,
         }
     }

@@ -1,0 +1,127 @@
+Q = (program
+  .
+  (expression_statement
+    (identifier) @node :: Shared
+  )
+  .
+  (B) @suppressed
+  .
+)
+----------------- INPUT (b.ptk) ------------------
+B = (expression_statement
+  {
+    (identifier) @node :: Shared
+  }? @present :: bool
+)
+---------------- INPUT (input.js) ----------------
+alpha; beta;
+------------------ DIAGNOSTICS -------------------
+warning: capture type `bool` replaces the record value captured by `@present` with a presence boolean
+ --> b.ptk:4:6
+  |
+3 |     (identifier) @node :: Shared
+  |                  --------------- this captured value is suppressed by `@present :: bool`
+4 |   }? @present :: bool
+  |      ^^^^^^^^^^^^^^^^
+  |
+help: remove `:: bool` to return the record value instead
+--------------------- OUTPUT ---------------------
+{
+  "node": {
+    "kind": "identifier",
+    "span": [0, 5],
+    "text": "alpha"
+  },
+  "suppressed": {
+    "present": true
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "present"
+S2 "node"
+S3 "suppressed"
+S4 "Shared"
+S5 "B"
+S6 "Q"
+S7 "program"
+S8 "expression_statement"
+S9 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = <Bool>
+T2 = Record  M0:1  ; { present }
+T3 = Alias(T0)
+T4 = Record  M1:2  ; { node, suppressed }
+
+[type_members]
+M0: S1 → T1  ; present: <Bool>
+M1: S2 → T3  ; node: Shared
+M2: S3 → T2  ; suppressed: B
+
+[type_names]
+N0: S4 → T3  ; Shared
+N1: S5 → T2  ; B
+N2: S6 → T4  ; Q
+
+[entrypoints]
+B = 00 :: T2
+Q = 02 :: T4
+
+[instructions]
+B:
+  00   !   (expression_statement)           21, 24
+
+Q:
+  02   !   (program)                        03
+  03  └•─  (expression_statement)           04
+  04  └‣─  (identifier)                     06          [Node RecordSet(M1 node)]
+  06  ─‣┘  _                                08          [RecordOpen]
+  08       (@34)                            34 : 09
+  09  ─•┘  _                                11          [RecordClose RecordSet(M2 suppressed)]
+  11       return
+  12   !   (identifier)                     13
+  13  ─‣┘  _                                18          [BoolValue(1) RecordSet(M0 present)]
+  15   !   (identifier)                     16
+  16  ─‣┘  _                                23          [BoolValue(1) RecordSet(M0 present)]
+  18       return
+  19  ──!  _                                12, 19
+  21  └─!  _                                12, 19
+  23       return
+  24  -ε-                                   18          [BoolValue(0) RecordSet(M0 present)]
+  26  ──!  _                                15, 26
+  28  └─!  _                                15, 26
+  30  ...
+  31  ...
+  32  -ε-                                   23          [BoolValue(0) RecordSet(M0 present)]
+  34  ─•─  (expression_statement)           28, 32
+--------------------- TRACE ----------------------
+Q:
+  02   !   (program)                        03
+       ●   (program)
+  03  └•─  (expression_statement)           04
+       ●   (expression_statement)
+  04  └‣─  (identifier)                     06          [Node RecordSet(M1 node)]
+       ●   (identifier)
+  06  ─‣┘  _                                08          [RecordOpen]
+       ●   (expression_statement)
+  08       (@34)                            34 : 09
+       ▶   (@34)
+
+@34:
+  34  ─•─  (expression_statement)           28, 32
+       ●   (expression_statement)
+  28  └─!  _                                15, 26
+       ●   (identifier)
+  15   !   (identifier)                     16
+       ●   (identifier)
+  16  ─‣┘  _                                23          [BoolValue(1) RecordSet(M0 present)]
+       ●   (expression_statement)
+  23   ◀   return                           09
+
+Q:
+  09  ─•┘  _                                11          [RecordClose RecordSet(M2 suppressed)]
+       ●   (program)
+  11   ◀   return                           ◼

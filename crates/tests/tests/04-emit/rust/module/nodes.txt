@@ -2,18 +2,9 @@ Q = (program
   (expression_statement (identifier) @id)
 )
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed result types, supplied-node execution
-// points, per-type result decoders, and the compiled matcher (`mod matcher`).
-// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
-// dispatch arm carries its instruction in the dump format.
-
 use ::plotnik_runtime as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 0;
-const _: () = assert!(
-    rt::RUNTIME_ABI == REQUIRED_RUNTIME_ABI,
-    "Plotnik runtime ABI mismatch"
-);
+const _: () = assert!(rt::RUNTIME_ABI == 0, "runtime interface mismatch");
 
 use ::plotnik_runtime::Node;
 
@@ -28,8 +19,8 @@ impl<'t> Q<'t> {
         node: rt::Node<'t>,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        let mut eng = rt::Engine::new(node.walk());
-        matcher::verify_language(node);
+        matcher::GRAMMAR.verify(node);
+        let mut eng = rt::MatcherEngine::new(node.walk());
         let mut scratch = rt::DecoderScratch::default();
         Self::apply(&mut eng, source, &mut scratch)
     }
@@ -41,15 +32,10 @@ impl<'t> Q<'t> {
         source: &'s str,
     ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
     + use<'t, 's> {
-        let mut eng = rt::Engine::new(scope.walk());
-        let mut verified = false;
+        let mut eng = rt::MatcherEngine::new(scope.walk());
         let mut scratch = rt::DecoderScratch::default();
         rt::Traversal::new(scope, move |node: rt::Node<'t>| {
-            if !verified {
-                matcher::verify_language(node);
-                verified = true;
-            }
-
+            matcher::GRAMMAR.verify(node);
             eng.reset(node);
             Self::apply(&mut eng, source, &mut scratch)
         })
@@ -72,7 +58,7 @@ impl<'t> Q<'t> {
     }
 
     fn apply(
-        eng: &mut rt::Engine<'t>,
+        eng: &mut rt::MatcherEngine<'t>,
         source: &str,
         scratch: &mut rt::DecoderScratch,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
@@ -109,367 +95,111 @@ impl<'t, 's> rt::Execute<'t, 's> for Q<'t> {
 /// Decode one committed `Q` value.
 fn decode_q<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Q<'t> {
     decoder.expect_record_open();
-    let mut v0 = None; // id
-    while !decoder.at_record_close() {
-        match decoder.peek_record_set() {
-            // id
-            0 => v0 = Some(decoder.expect_node()),
-            other => unreachable!("journal shape proven at emit: `Q` has no member index {other}"),
-        }
-        decoder.expect_record_set();
+    let v0 = decoder.expect_node();
+    match decoder.expect_record_set() {
+        0 => {},
+        other => unreachable!("journal shape proven at emit: `Q` has no member index {other}"),
     }
     decoder.expect_record_close();
     Q {
-        id: v0.expect("field-stability: every accepting path sets `id`"),
+        id: v0,
     }
 }
 
-pub use self::matcher::q_journal;
-
-/// The compiled matcher: engine machinery shielded from the query's
-/// type namespace.
 mod matcher {
     use ::plotnik_runtime as rt;
+    use rt::Flow;
 
-    /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
-    /// as the generation-time grammar defines them.
-    const EXPECTED_KINDS: &[(u16, &str, bool)] = &[
-        (1, "identifier", true),
-        (134, "program", true),
-        (150, "expression_statement", true),
-    ];
+    pub(super) static GRAMMAR: rt::Grammar = rt::Grammar {
+        kinds: &[
+            (1, "identifier", true),
+            (134, "program", true),
+            (150, "expression_statement", true),
+        ],
+        fields: &[
+        ],
+        identity: None,
+    };
 
-    /// Field ids baked into the field checks: `(id, name)`.
-    const EXPECTED_FIELDS: &[(u16, &str)] = &[];
-
-    /// A parser built from any other grammar version could renumber the baked
-    /// kind/field ids and silently mis-match, so mismatches panic: version skew
-    /// between the generation-time grammar and the runtime parser is a build
-    /// mistake, not a runtime condition to recover from.
-    pub(super) fn verify_language(node: rt::Node<'_>) {
-        let language = node.language();
-        for &(id, name, named) in EXPECTED_KINDS {
-            let found = language.node_kind_for_id(id);
-            if found != Some(name) || language.node_kind_is_named(id) != named {
-                panic!(
-                    "grammar version skew: this query module was generated against a \
-                     grammar where node kind {id} is {name:?}, but the tree's language \
-                     says {found:?} — rebuild the module with the grammar of the parser \
-                     that produced the tree",
-                );
-            }
-        }
-        for &(id, name) in EXPECTED_FIELDS {
-            let found = language.field_name_for_id(id);
-            if found != Some(name) {
-                panic!(
-                    "grammar version skew: this query module was generated against a \
-                     grammar where field {id} is {name:?}, but the tree's language \
-                     says {found:?} — rebuild the module with the grammar of the parser \
-                     that produced the tree",
-                );
-            }
-        }
+    pub(super) fn q_apply<'a, 't>(eng: &'a mut rt::MatcherEngine<'t>, source: &str) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        rt::Matcher { runner: run_0 }.run(eng, source, 0, rt::EntryBoundary::new(true, false))
     }
 
-    // Dense runtime state ids, in NFA label order.
-    // Q:
-    const S1_Q: u16 = 0;
-    const S2_Q: u16 = 1;
-    const S4_Q: u16 = 2;
-    const S5_Q: u16 = 3;
-    const S6_Q: u16 = 4;
+    // Q
 
-    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
-    /// match journal — the same event sequence the VM commits for this query.
-    pub fn q_journal<'t>(
-        tree: &'t rt::Tree,
-        source: &str,
-    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        let entry = S2_Q;
-        let boundary = EntryBoundary::new(true, false);
-        run(tree, source, entry, boundary)
-    }
-
-    /// Apply one candidate at the engine's current node.
-    pub(super) fn q_apply<'a, 't>(
-        eng: &'a mut rt::Engine<'t>,
-        source: &str,
-    ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        run_at_node(eng, source, S2_Q, EntryBoundary::new(true, false))
-    }
-    #[derive(Clone, Copy)]
-    struct EntryBoundary {
-        record: bool,
-        node: bool,
-    }
-
-    impl EntryBoundary {
-        const fn new(record: bool, node: bool) -> Self {
-            Self { record, node }
-        }
-
-        fn begin(self, eng: &mut rt::Engine<'_>) {
-            if self.record {
-                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordOpen);
-            }
-        }
-
-        fn finish(self, eng: &mut rt::Engine<'_>) {
-            if self.node {
-                let _ = eng.emit_output_event(|cursor| rt::JournalEvent::Node(cursor.node()));
-                return;
-            }
-            if self.record {
-                let _ = eng.emit_output_event(|_| rt::JournalEvent::RecordClose);
-            }
-        }
-    }
-
-    /// What a dispatched state hands back to the driver loop.
-    enum Flow {
-        /// Continue at this state.
-        Jump(u16),
-        /// The entrypoint accepted; the match journal is committed.
-        Accept,
-        /// The state failed; unwind the checkpoint stack.
-        Backtrack,
-    }
-
-    /// How the backtrack unwind resumed execution.
-    enum Unwound {
-        Resumed(u16),
-        Accepted,
-        NoMatch,
-    }
-
-    /// One dispatch loop serves every entrypoint; `entry` selects the definition
-    /// body and `boundary` supplies its root result effects.
-    fn run<'t>(
-        tree: &'t rt::Tree,
-        source: &str,
-        entry: u16,
-        boundary: EntryBoundary,
-    ) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        let mut eng = rt::Engine::new(tree.root_node().walk());
-        verify_language(eng.node());
-        let accepted = run_at_node(&mut eng, source, entry, boundary)?.is_some();
-        Ok(accepted.then(|| eng.into_journal()))
-    }
-
-    fn run_at_node<'a, 't>(
-        eng: &'a mut rt::Engine<'t>,
-        source: &str,
-        entry: u16,
-        boundary: EntryBoundary,
-    ) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
-        boundary.begin(eng);
-        let mut ip = entry;
-        loop {
-            match dispatch(eng, source, ip) {
-                Flow::Jump(next) => ip = next,
-                Flow::Accept => {
-                    boundary.finish(eng);
-                    return Ok(Some(eng.accepted_journal()));
-                }
-                Flow::Backtrack => match backtrack(eng, source) {
-                    Unwound::Resumed(next) => ip = next,
-                    Unwound::Accepted => {
-                        boundary.finish(eng);
-                        return Ok(Some(eng.accepted_journal()));
+    pub(crate) fn run_0(eng: &mut rt::MatcherEngine<'_>, source: &str, mut block: u32) -> Flow {
+        let _ = (&eng, &source);
+        'run: loop {
+            return match block {
+                0 => {
+                    //   2   !   (program)                         4
+                    let node = eng.node();
+                    if node.kind_id() != 134 || !node.is_named() { return Flow::Backtrack; }
+                    //   4  └‣─  (expression_statement)            6
+                    if eng.cursor_mut().navigate(rt::Nav::Down).is_none() { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(node.kind_id() != 150 || !node.is_named()) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
                     }
-                    Unwound::NoMatch => return Ok(None),
-                },
-            }
-        }
-    }
-
-    #[inline]
-    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
-        match ip {
-            //   1       return
-            S1_Q => Flow::Accept,
-            //   2   !   (program)                         4
-            S2_Q => 'state: {
-                if !cand_s2_q(eng) {
-                    break 'state Flow::Backtrack;
-                }
-                Flow::Jump(S4_Q)
-            }
-            //   4  └‣─  (expression_statement)            6
-            S4_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
-                    break 'state Flow::Backtrack;
-                }
-                loop {
-                    if cand_s4_q(eng) {
-                        break;
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 3u32));
                     }
-                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                        break 'state Flow::Backtrack;
+                    block = 2;
+                    continue 'run;
+                }
+                1 => {
+                    //   5  ─‣┘² _                                 1
+                    if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() { return Flow::Backtrack; }
+                    //   1       return
+                    Flow::Return(rt::PortId::from_raw(0))
+                }
+                2 => {
+                    //   6  └‣─  (identifier)                      5           [Node RecordSet(id)]
+                    if eng.cursor_mut().navigate(rt::Nav::Down).is_none() { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(node.kind_id() != 1 || !node.is_named()) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
                     }
-                }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S4_Q));
-                }
-                finish_s4_q(eng)
-            }
-            //   5  ─‣┘² _                                 1
-            S5_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() {
-                    break 'state Flow::Backtrack;
-                }
-                Flow::Jump(S1_Q)
-            }
-            //   6  └‣─  (identifier)                      5           [Node RecordSet(id)]
-            S6_Q => 'state: {
-                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
-                    break 'state Flow::Backtrack;
-                }
-                loop {
-                    if cand_s6_q(eng) {
-                        break;
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 4u32));
                     }
-                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                        break 'state Flow::Backtrack;
+                    eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                    eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0));
+                    block = 1;
+                    continue 'run;
+                }
+                3 => {
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(node.kind_id() != 150 || !node.is_named()) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
                     }
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 3u32));
+                    }
+                    block = 2;
+                    continue 'run;
                 }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S6_Q));
+                4 => {
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(node.kind_id() != 1 || !node.is_named()) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    }
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 4u32));
+                    }
+                    eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                    eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0));
+                    block = 1;
+                    continue 'run;
                 }
-                finish_s6_q(eng)
-            }
-            _ => unreachable!("ip {ip} is not a generated state"),
-        }
-    }
-
-    /// `S2_Q` candidate: `(program)`.
-    #[inline]
-    fn cand_s2_q(eng: &rt::Engine<'_>) -> bool {
-        let node = eng.node();
-        // program
-        if node.kind_id() != 134 {
-            return false;
-        }
-        // (_)
-        if !node.is_named() {
-            return false;
-        }
-        true
-    }
-
-    /// `S4_Q` candidate: `(expression_statement)`.
-    #[inline]
-    fn cand_s4_q(eng: &rt::Engine<'_>) -> bool {
-        let node = eng.node();
-        // expression_statement
-        if node.kind_id() != 150 {
-            return false;
-        }
-        // (_)
-        if !node.is_named() {
-            return false;
-        }
-        true
-    }
-
-    /// `S6_Q` candidate: `(identifier)`.
-    #[inline]
-    fn cand_s6_q(eng: &rt::Engine<'_>) -> bool {
-        let node = eng.node();
-        // identifier
-        if node.kind_id() != 1 {
-            return false;
-        }
-        // (_)
-        if !node.is_named() {
-            return false;
-        }
-        true
-    }
-
-    /// `S4_Q` post-acceptance: effects, then successor dispatch. Shared by the dispatch
-    /// path and the match-retry resume, so a retried candidate emits exactly
-    /// what the original acceptance would have emitted.
-    #[inline]
-    fn finish_s4_q(_eng: &mut rt::Engine<'_>) -> Flow {
-        Flow::Jump(S6_Q)
-    }
-
-    /// `S6_Q` post-acceptance: effects, then successor dispatch. Shared by the dispatch
-    /// path and the match-retry resume, so a retried candidate emits exactly
-    /// what the original acceptance would have emitted.
-    #[inline]
-    fn finish_s6_q(eng: &mut rt::Engine<'_>) -> Flow {
-        eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
-        eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(id)
-        Flow::Jump(S5_Q)
-    }
-
-    /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
-    /// Match checkpoints advance their sibling search and re-enter. Loops, never
-    /// recurses — a run of exhausted retries unwinds in one call.
-    fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
-        'unwind: loop {
-            let Some((cp, snapshot)) = eng.pop_checkpoint() else {
-                return Unwound::NoMatch;
+                _ => unreachable!("invalid local runner block {block}"),
             };
-            eng.restore_checkpoint_state(cp.state, snapshot);
-
-            match cp.resume {
-                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
-
-                rt::Resume::Call(_) => unreachable!("matcher has no call checkpoints"),
-
-                // Match retry: advance past the accepted-but-failed candidate and
-                // re-run that state's sibling search from there.
-                rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
-                    Some(Flow::Jump(next)) => return Unwound::Resumed(next),
-                    Some(Flow::Accept) => return Unwound::Accepted,
-                    Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
-                    None => continue 'unwind,
-                },
-            }
-        }
-    }
-
-    fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
-        match ip {
-            S4_Q => {
-                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                    return None;
-                }
-                loop {
-                    if cand_s4_q(eng) {
-                        break;
-                    }
-                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                        return None;
-                    }
-                }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S4_Q));
-                }
-                Some(finish_s4_q(eng))
-            }
-            S6_Q => {
-                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                    return None;
-                }
-                loop {
-                    if cand_s6_q(eng) {
-                        break;
-                    }
-                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                        return None;
-                    }
-                }
-                if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S6_Q));
-                }
-                Some(finish_s6_q(eng))
-            }
-            _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
         }
     }
 }

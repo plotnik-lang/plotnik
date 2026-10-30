@@ -61,14 +61,6 @@ impl ResultItem {
         matches!(self.kind, ResultItemKind::Record | ResultItemKind::Variant)
     }
 
-    fn scope_kind(self) -> Option<CaptureScopeKind> {
-        match self.kind {
-            ResultItemKind::Record => Some(CaptureScopeKind::Record),
-            ResultItemKind::Variant => Some(CaptureScopeKind::Variant),
-            ResultItemKind::Alias | ResultItemKind::MatchOnlyDef => None,
-        }
-    }
-
     pub(crate) fn value_type(self) -> TypeId {
         self.output
             .value()
@@ -86,6 +78,13 @@ pub(crate) enum CaptureScopeKind {
 pub(crate) struct PublicResultGroup {
     representative: TypeId,
     occurrences: Vec<TypeId>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum ResultTarget {
+    Item(Symbol),
+    Shape(TypeId),
+    Payload(TypeId),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,17 +118,6 @@ impl CaptureScope {
 
     pub(crate) fn members(&self) -> impl ExactSizeIterator<Item = ResultMemberId> + '_ {
         self.members_by_name.values().copied()
-    }
-
-    pub(crate) fn member_id(&self, relative: u16) -> Option<ResultMemberId> {
-        if usize::from(relative) >= self.members_by_name.len() {
-            return None;
-        }
-        let absolute = self
-            .base
-            .checked_add(relative)
-            .expect("capture scope member belongs to the result member space");
-        Some(ResultMemberId::from_raw(absolute))
     }
 
     pub(crate) fn member_named(&self, name: Symbol) -> Option<ResultMemberId> {
@@ -296,23 +284,106 @@ impl CaptureLayout {
 }
 
 impl PublicResultGroup {
-    fn new(item: ResultItem, types: &TypeAnalysis, layout: &CaptureLayout) -> Self {
-        let representative = item.value_type();
-        let kind = layout
-            .scope(representative)
-            .expect("composite result item has a capture scope")
-            .kind();
-        let expected_kind = item
-            .scope_kind()
-            .expect("only composite result items form public groups");
-        assert_eq!(kind, expected_kind, "public item kind matches its scope");
+    fn collect(
+        items: &[ResultItem],
+        types: &TypeAnalysis,
+        layout: &CaptureLayout,
+        roots: impl IntoIterator<Item = (Symbol, TypeId)>,
+    ) -> BTreeMap<Symbol, Self> {
+        let mut groups = BTreeMap::new();
+        let mut pending = Vec::new();
+        for item in items.iter().copied().filter(|item| item.is_composite()) {
+            let group = Self {
+                representative: item.value_type(),
+                occurrences: Vec::new(),
+            };
+            let previous = groups.insert(item.name, group);
+            assert!(previous.is_none(), "public result item names are unique");
+        }
+        let item_names = items.iter().map(|item| item.name).collect::<HashSet<_>>();
+        for (name, occurrence) in roots {
+            if item_names.contains(&name) {
+                pending.push((ResultTarget::Item(name), occurrence));
+            }
+        }
+        for (type_id, name) in types.iter_named_types() {
+            if groups.contains_key(&name) && layout.scope(type_id).is_some() {
+                pending.push((ResultTarget::Item(name), type_id));
+            }
+        }
 
-        let mut group = Self {
-            representative,
-            occurrences: Vec::new(),
-        };
-        group.add_occurrence(types, layout, representative);
-        group
+        let mut visited = HashSet::new();
+        while let Some((target, occurrence)) = pending.pop() {
+            let occurrence = types.resolve_underlying_type_id(occurrence);
+            if !visited.insert((target, occurrence)) {
+                continue;
+            }
+            let representative = match target {
+                ResultTarget::Item(name) => {
+                    let body = types
+                        .public_type(name)
+                        .value()
+                        .expect("a public result binding produces a value");
+                    if let Some(group) = groups.get_mut(&name) {
+                        group.add_occurrence(types, layout, occurrence);
+                    }
+                    if matches!(types.expect_type_shape(body), TypeShape::Ref(_)) {
+                        pending.push((ResultTarget::Shape(body), occurrence));
+                        continue;
+                    }
+                    body
+                }
+                ResultTarget::Shape(ty) => {
+                    if let Some(name) = types.public_name(ty) {
+                        pending.push((ResultTarget::Item(name), occurrence));
+                        continue;
+                    }
+                    ty
+                }
+                ResultTarget::Payload(ty) => ty,
+            };
+            match (
+                types.expect_type_shape(representative),
+                types.expect_type_shape(occurrence),
+            ) {
+                (TypeShape::Record(fields), TypeShape::Record(actual)) => {
+                    for (&name, field) in fields {
+                        let actual = actual.get(&name).expect("bound records share field names");
+                        pending.push((ResultTarget::Shape(field.final_type), actual.final_type));
+                    }
+                }
+                (TypeShape::Variant(cases), TypeShape::Variant(actual)) => {
+                    for (&name, payload) in cases {
+                        let actual = actual.get(&name).expect("bound variants share case names");
+                        if let Some(payload) = payload.type_id() {
+                            pending.push((
+                                ResultTarget::Payload(payload),
+                                actual
+                                    .type_id()
+                                    .expect("bound cases share payload presence"),
+                            ));
+                        }
+                    }
+                }
+                (TypeShape::Option(inner), TypeShape::Option(actual))
+                | (
+                    TypeShape::List { element: inner, .. },
+                    TypeShape::List {
+                        element: actual, ..
+                    },
+                ) => {
+                    pending.push((ResultTarget::Shape(*inner), *actual));
+                }
+                (TypeShape::Node, TypeShape::Node)
+                | (TypeShape::Text, TypeShape::Text)
+                | (TypeShape::Bool, TypeShape::Bool) => {}
+                _ => unreachable!("validated public and concrete result shapes agree"),
+            }
+        }
+        for group in groups.values_mut() {
+            group.finish();
+        }
+        groups
     }
 
     fn add_occurrence(&mut self, types: &TypeAnalysis, layout: &CaptureLayout, type_id: TypeId) {
@@ -330,8 +401,8 @@ impl PublicResultGroup {
         self.occurrences.sort_unstable();
         self.occurrences.dedup();
         assert!(
-            self.occurrences.contains(&self.representative),
-            "public result occurrences include their representative"
+            !self.occurrences.is_empty(),
+            "public result has concrete bindings"
         );
     }
 
@@ -411,30 +482,14 @@ impl ResultModel {
         type_name_bindings.dedup();
         let entrypoint_items =
             ItemCollector::new(types, definitions).collect(artifacts.iter_entrypoint_outputs());
-        let mut public_result_groups = BTreeMap::new();
-        for item in entrypoint_items
-            .iter()
-            .copied()
-            .filter(|item| item.is_composite())
-        {
-            let previous = public_result_groups.insert(
-                item.name,
-                PublicResultGroup::new(item, types, &capture_layout),
-            );
-            assert!(previous.is_none(), "public result item names are unique");
-        }
-        for (type_id, name) in types.iter_named_types() {
-            let Some(group) = public_result_groups.get_mut(&name) else {
-                continue;
-            };
-            if capture_layout.scope(type_id).is_none() {
-                continue;
-            }
-            group.add_occurrence(types, &capture_layout, type_id);
-        }
-        for group in public_result_groups.values_mut() {
-            group.finish();
-        }
+        let occurrences = reachable_defs.iter().filter_map(|definition| {
+            types
+                .expect_def_output(definition)
+                .value()
+                .map(|body| (definitions.definition(definition).name(), body))
+        });
+        let public_result_groups =
+            PublicResultGroup::collect(&entrypoint_items, types, &capture_layout, occurrences);
         Ok(Self {
             reachable_defs,
             type_layout,
@@ -541,17 +596,22 @@ impl<'a> ItemCollector<'a> {
                 DefinitionOutput::MatchOnly => {
                     self.items.push(ResultItem::match_only_definition(name));
                 }
-                DefinitionOutput::Value(type_id) => self.add_item(name, type_id),
+                DefinitionOutput::Value(_) => self.add_item(name),
             }
         }
         self.items
     }
 
-    fn add_item(&mut self, name: Symbol, ty: TypeId) {
+    fn add_item(&mut self, name: Symbol) {
         if !self.declared_names.insert(name) {
             return;
         }
 
+        let ty = self
+            .types
+            .public_type(name)
+            .value()
+            .expect("value-bearing public item has a representative");
         let item = ResultItem::for_result(name, ty, self.types.expect_type_shape(ty));
         self.items.push(item);
         self.walk(ty);
@@ -596,14 +656,14 @@ impl<'a> ItemCollector<'a> {
                     .types
                     .type_name_of(ty)
                     .expect("naming pass names every non-payload composite");
-                self.add_item(name, ty);
+                self.add_item(name);
             }
             TypeShape::List { .. } | TypeShape::Option(_) => {
                 let Some(name) = self.types.type_name_of(ty) else {
                     self.walk(ty);
                     return;
                 };
-                self.add_item(name, ty);
+                self.add_item(name);
             }
             TypeShape::Ref(declaration) => self.collect_reference(*declaration),
             TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
@@ -614,7 +674,7 @@ impl<'a> ItemCollector<'a> {
         let Some(declaration) = self.types.declaration(declaration) else {
             return;
         };
-        self.add_item(declaration.name, declaration.body);
+        self.add_item(declaration.name);
     }
 }
 

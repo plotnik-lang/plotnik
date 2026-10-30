@@ -5,7 +5,7 @@ use clap::ArgMatches;
 use super::ColorChoice;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
-use crate::commands::generate::{GenerateArgs, GenerateTarget};
+use crate::commands::generate::GenerateArgs;
 use crate::commands::language::LanguageOptions;
 
 pub struct CheckOpts {
@@ -72,8 +72,6 @@ impl From<DumpOpts> for DumpArgs {
 pub struct GenerateOpts {
     pub query_path: PathBuf,
     pub language: LanguageOptions,
-    pub target: GenerateTarget,
-    pub output: Option<PathBuf>,
     pub color: ColorChoice,
 }
 
@@ -85,11 +83,6 @@ impl GenerateOpts {
                 .expect("clap requires PATH")
                 .clone(),
             language: LanguageOptions::from_matches(m),
-            target: m
-                .get_one::<GenerateTarget>("target")
-                .copied()
-                .expect("clap guarantees --target is present"),
-            output: m.get_one::<PathBuf>("output").cloned(),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -100,8 +93,6 @@ impl From<GenerateOpts> for GenerateArgs {
         Self {
             query_path: p.query_path,
             language: p.language,
-            target: p.target,
-            output: p.output,
             color: p.color.should_colorize(),
         }
     }

@@ -1,0 +1,97 @@
+Q = (program
+  .
+  (B)
+  .
+  (expression_statement
+    (identifier) @node :: Shared
+  )
+  .
+)
+----------------- INPUT (b.ptk) ------------------
+B = (expression_statement
+  (identifier) @node :: Shared
+) @_
+---------------- INPUT (input.js) ----------------
+alpha; beta;
+--------------------- OUTPUT ---------------------
+{
+  "node": {
+    "kind": "identifier",
+    "span": [7, 11],
+    "text": "beta"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "node"
+S2 "Shared"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "identifier"
+S7 "B"
+
+[type_defs]
+T0 = <NoValue>
+T1 = <Node>
+T2 = Alias(T1)
+T3 = Record  M0:1  ; { node }
+
+[type_members]
+M0: S1 → T2  ; node: Shared
+
+[type_names]
+N0: S2 → T2  ; Shared
+N1: S3 → T3  ; Q
+
+[entrypoints]
+B = 00 :: T0
+Q = 04 :: T3
+
+[instructions]
+B:
+  00   !   (expression_statement)           01
+  01  └‣─  (identifier)                     02
+  02  ─‣┘  _                                03
+  03       return
+
+Q:
+  04   !   (program)                        05
+  05       (@16)                            16 : 06
+  06  ─•─  (expression_statement)           08
+  07  ...
+  08  └‣─  (identifier)                     10          [Node RecordSet(M0 node)]
+  10  ─‣┘  _                                11
+  11  ─•┘  _                                12
+  12       return
+  13  └‣─  (identifier)                     14
+  14  ─‣┘  _                                15
+  15       return
+  16  └•─  (expression_statement)           13
+--------------------- TRACE ----------------------
+Q:
+  04   !   (program)                        05
+       ●   (program)
+  05       (@16)                            16 : 06
+       ▶   (@16)
+
+@16:
+  16  └•─  (expression_statement)           13
+       ●   (expression_statement)
+  13  └‣─  (identifier)                     14
+       ●   (identifier)
+  14  ─‣┘  _                                15
+       ●   (expression_statement)
+  15   ◀   return                           06
+
+Q:
+  06  ─•─  (expression_statement)           08
+       ●   (expression_statement)
+  08  └‣─  (identifier)                     10          [Node RecordSet(M0 node)]
+       ●   (identifier)
+  10  ─‣┘  _                                11
+       ●   (expression_statement)
+  11  ─•┘  _                                12
+       ●   (program)
+  12   ◀   return                           ◼

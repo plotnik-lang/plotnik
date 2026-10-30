@@ -1,0 +1,25 @@
+Q = (A)
+------------- INPUT (recursive.ptk) --------------
+A = [
+  (Leaf)
+  (parenthesized_expression (B))
+]
+
+B = (parenthesized_expression (A))
+---------------- INPUT (leaf.ptk) ----------------
+Leaf = (identifier)
+------------------ DEFINITIONS -------------------
+Q
+  A
+    B
+      A (cycle)
+    Leaf
+A
+  B
+    A (cycle)
+  Leaf
+B
+  A
+    B (cycle)
+    Leaf
+Leaf

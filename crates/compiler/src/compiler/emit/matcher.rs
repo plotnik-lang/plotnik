@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use plotnik_runtime::{Nav, SkipPolicy};
 use regex_syntax::hir::Hir;
@@ -33,20 +33,61 @@ impl RegexId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum StateOrigin {
-    Definition,
-    ConsumingDefinition,
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct StatePlan {
     pub(crate) id: StateId,
     pub(crate) label: Label,
-    pub(crate) definition: String,
-    pub(crate) origin: StateOrigin,
+    pub(crate) owner: DefId,
     pub(crate) provenance: String,
     pub(crate) kind: StatePlanKind,
+}
+
+impl StatePlan {
+    pub(crate) fn flows(&self) -> Vec<&FlowPlan> {
+        match &self.kind {
+            StatePlanKind::Switch(cases) => cases.iter().map(|case| &case.action.flow).collect(),
+            StatePlanKind::Epsilon { flow, .. } => vec![flow],
+            StatePlanKind::Match(plan) => vec![&plan.action.flow],
+            StatePlanKind::Call(_) | StatePlanKind::Return(_) => Vec::new(),
+        }
+    }
+
+    fn straight_successor(&self) -> Option<StateId> {
+        match &self.kind {
+            StatePlanKind::Epsilon {
+                flow: FlowPlan::Jump(next),
+                ..
+            } => Some(*next),
+            StatePlanKind::Match(MatchPlan {
+                retry: None,
+                action:
+                    MatchActionPlan {
+                        flow: FlowPlan::Jump(next),
+                        ..
+                    },
+                ..
+            }) => Some(*next),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DefinitionPlan {
+    pub(crate) owner: DefId,
+    pub(crate) blocks: Vec<BlockPlan>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct BlockPlan {
+    pub(crate) id: u32,
+    pub(crate) kind: BlockKind,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum BlockKind {
+    States(Vec<StateId>),
+    Retry(StateId),
 }
 
 #[derive(Clone, Debug)]
@@ -64,7 +105,6 @@ pub(crate) enum StatePlanKind {
 #[derive(Clone, Debug)]
 pub(crate) struct SwitchActionPlan {
     pub(crate) kind: NodeKindId,
-    pub(crate) pattern: String,
     pub(crate) prefix: Vec<Vec<EffectPlan>>,
     pub(crate) action: MatchActionPlan,
 }
@@ -76,7 +116,6 @@ pub(crate) struct MatchPlan {
     pub(crate) retry: Option<SkipPolicy>,
     pub(crate) kind: Option<KindCheck>,
     pub(crate) action: MatchActionPlan,
-    pub(crate) candidate_pattern: String,
 }
 
 #[derive(Clone, Debug)]
@@ -95,19 +134,8 @@ impl MatchPlan {
         self.kind.is_some() || !self.action.checks.is_empty()
     }
 
-    pub(crate) fn has_predicate(&self) -> bool {
-        self.action
-            .checks
-            .iter()
-            .any(|check| matches!(check, CheckPlan::Predicate(_)))
-    }
-
     pub(crate) fn needs_node_binding(&self) -> bool {
         self.kind.is_some() || self.action.checks.iter().any(CheckPlan::reads_node)
-    }
-
-    pub(crate) fn can_fail_before_flow(&self) -> bool {
-        self.navigates() || self.has_candidate_checks()
     }
 }
 
@@ -136,10 +164,6 @@ impl CallPlan {
     pub(crate) fn stays_on_current_node(&self) -> bool {
         matches!(self.nav, Nav::Stay | Nav::StayExact)
     }
-
-    pub(crate) fn can_fail_before_flow(&self) -> bool {
-        self.caller_owned() && (!self.stays_on_current_node() || self.field.is_some())
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -152,11 +176,21 @@ pub(crate) enum FlowPlan {
     },
 }
 
+impl FlowPlan {
+    fn targets(&self) -> impl Iterator<Item = StateId> + '_ {
+        let (next, rest): (Option<StateId>, &[StateId]) = match self {
+            Self::Accept => (None, &[]),
+            Self::Jump(next) => (Some(*next), &[]),
+            Self::Fork { next, successors } => (Some(*next), successors),
+        };
+        next.into_iter().chain(rest.iter().copied())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct EffectPlan {
     pub(crate) kind: EffectKind,
     pub(crate) payload: u16,
-    pub(crate) display: String,
 }
 
 #[derive(Clone, Debug)]
@@ -183,7 +217,6 @@ pub(crate) enum KindClass {
 #[derive(Clone, Debug)]
 pub(crate) struct KindCheck {
     pub(crate) id: NodeKindId,
-    pub(crate) name: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -201,7 +234,7 @@ pub(crate) struct PredicatePlan {
 #[derive(Clone, Debug)]
 pub(crate) enum PredicateValuePlan {
     String(String),
-    Regex { id: RegexId, pattern: String },
+    Regex { id: RegexId },
 }
 
 #[derive(Clone, Debug)]
@@ -229,14 +262,20 @@ pub(crate) struct EntryPlan {
 #[derive(Clone, Debug)]
 pub(crate) struct MatcherPlan {
     states: Vec<StatePlan>,
+    definitions: Vec<DefinitionPlan>,
+    state_blocks: BTreeMap<StateId, u32>,
+    retry_blocks: BTreeMap<StateId, u32>,
     entrypoints: Vec<EntryPlan>,
     expected_kinds: Vec<ExpectedKind>,
     fields: Vec<FieldPlan>,
     regexes: Vec<RegexPlan>,
-    label_width: usize,
-    any_predicate: bool,
-    any_retry_predicate: bool,
 }
+
+type BlockPartition = (
+    Vec<DefinitionPlan>,
+    BTreeMap<StateId, u32>,
+    BTreeMap<StateId, u32>,
+);
 
 impl MatcherPlan {
     pub(super) fn build(
@@ -280,23 +319,146 @@ impl MatcherPlan {
             })
             .collect();
 
-        let mut builder = MatcherPlanBuilder::new(&dumper, artifacts, &ids);
-        let states = sorted
+        let mut builder = MatcherPlanBuilder::new(graph, &dumper, artifacts, &ids);
+        let states: Vec<_> = sorted
             .into_iter()
             .enumerate()
             .map(|(index, instruction)| builder.state(graph, index, instruction))
             .collect();
 
+        let (definitions, state_blocks, retry_blocks) = Self::partition(&states, &entrypoints);
+
         Ok(Self {
             states,
+            definitions,
+            state_blocks,
+            retry_blocks,
             entrypoints,
             expected_kinds: builder.expected_kinds.into_values().collect(),
             fields: builder.fields,
             regexes: builder.regexes,
-            label_width: dumper.label_width(),
-            any_predicate: builder.any_predicate,
-            any_retry_predicate: builder.any_retry_predicate,
         })
+    }
+
+    fn partition(states: &[StatePlan], entries: &[EntryPlan]) -> BlockPartition {
+        let state = |id: StateId| &states[usize::from(id.raw())];
+        let mut groups = BTreeMap::<DefId, Vec<StateId>>::new();
+        let mut incoming = vec![0usize; states.len()];
+        let mut boundaries = BTreeSet::new();
+        for current in states {
+            groups.entry(current.owner).or_default().push(current.id);
+            for flow in current.flows() {
+                for target in flow.targets() {
+                    assert_eq!(
+                        current.owner,
+                        state(target).owner,
+                        "ordinary edge {:?} -> {:?} crosses definition ownership",
+                        current.label,
+                        state(target).label
+                    );
+                    incoming[usize::from(target.raw())] += 1;
+                    if current.straight_successor().is_none() {
+                        boundaries.insert(target);
+                    }
+                }
+            }
+            if let StatePlanKind::Call(call) = &current.kind {
+                boundaries.insert(call.target);
+                for &target in &call.returns {
+                    assert_eq!(
+                        current.owner,
+                        state(target).owner,
+                        "call return {:?} -> {:?} crosses definition ownership",
+                        current.label,
+                        state(target).label
+                    );
+                    boundaries.insert(target);
+                }
+            }
+        }
+        for entry in entries {
+            assert_eq!(
+                entry.definition,
+                state(entry.entry).owner,
+                "entrypoint must belong to its definition runner"
+            );
+            boundaries.insert(entry.entry);
+        }
+        for current in states {
+            if incoming[usize::from(current.id.raw())] != 1 {
+                boundaries.insert(current.id);
+            }
+        }
+
+        let mut definitions = Vec::new();
+        let mut state_blocks = BTreeMap::new();
+        let mut retry_blocks = BTreeMap::new();
+        let mut covered = 0;
+        for (owner, ids) in groups {
+            let mut blocks = Vec::new();
+            for &start in ids.iter().filter(|id| boundaries.contains(id)) {
+                let id = u32::try_from(blocks.len()).expect("local block count fits u32");
+                state_blocks.insert(start, id);
+                let mut chain = Vec::new();
+                let mut next = start;
+                loop {
+                    chain.push(next);
+                    let Some(target) = state(next).straight_successor() else {
+                        break;
+                    };
+                    if boundaries.contains(&target) {
+                        break;
+                    }
+                    next = target;
+                }
+                covered += chain.len();
+                blocks.push(BlockPlan {
+                    id,
+                    kind: BlockKind::States(chain),
+                });
+            }
+            for &id in &ids {
+                let retry = match &state(id).kind {
+                    StatePlanKind::Match(plan) => plan.retry.is_some(),
+                    StatePlanKind::Call(plan) => plan.retry.is_some(),
+                    _ => false,
+                };
+                if retry {
+                    let block =
+                        u32::try_from(blocks.len()).expect("local retry block count fits u32");
+                    retry_blocks.insert(id, block);
+                    blocks.push(BlockPlan {
+                        id: block,
+                        kind: BlockKind::Retry(id),
+                    });
+                }
+            }
+            definitions.push(DefinitionPlan { owner, blocks });
+        }
+        assert_eq!(covered, states.len(), "local blocks cover every state");
+        (definitions, state_blocks, retry_blocks)
+    }
+
+    pub(crate) fn definitions(&self) -> &[DefinitionPlan] {
+        &self.definitions
+    }
+
+    pub(crate) fn state(&self, id: StateId) -> &StatePlan {
+        &self.states[usize::from(id.raw())]
+    }
+
+    pub(crate) fn block(&self, id: StateId) -> u32 {
+        *self
+            .state_blocks
+            .get(&id)
+            .expect("resume target starts a local block")
+    }
+
+    pub(crate) fn retry_block(&self, id: StateId) -> u32 {
+        *self
+            .retry_blocks
+            .get(&id)
+            .expect("retryable state has a local retry block")
     }
 
     pub(crate) fn states(&self) -> &[StatePlan] {
@@ -318,22 +480,11 @@ impl MatcherPlan {
     pub(crate) fn regexes(&self) -> &[RegexPlan] {
         &self.regexes
     }
-
-    pub(crate) fn label_width(&self) -> usize {
-        self.label_width
-    }
-
-    pub(crate) fn any_predicate(&self) -> bool {
-        self.any_predicate
-    }
-
-    pub(crate) fn any_retry_predicate(&self) -> bool {
-        self.any_retry_predicate
-    }
 }
 
 struct MatcherPlanBuilder<'p, 'a> {
     dumper: &'p NfaDumper<'a>,
+    instructions: HashMap<Label, &'a InstructionIR>,
     artifacts: AnalysisArtifacts<'a>,
     ids: &'p BTreeMap<Label, StateId>,
     expected_kinds: BTreeMap<NodeKindId, ExpectedKind>,
@@ -341,18 +492,22 @@ struct MatcherPlanBuilder<'p, 'a> {
     fields: Vec<FieldPlan>,
     regex_ids: BTreeMap<String, RegexId>,
     regexes: Vec<RegexPlan>,
-    any_predicate: bool,
-    any_retry_predicate: bool,
 }
 
 impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     fn new(
+        graph: &'a NfaGraph,
         dumper: &'p NfaDumper<'a>,
         artifacts: AnalysisArtifacts<'a>,
         ids: &'p BTreeMap<Label, StateId>,
     ) -> Self {
         Self {
             dumper,
+            instructions: graph
+                .instructions()
+                .iter()
+                .map(|instruction| (instruction.label(), instruction))
+                .collect(),
             artifacts,
             ids,
             expected_kinds: BTreeMap::new(),
@@ -360,46 +515,40 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             fields: Vec::new(),
             regex_ids: BTreeMap::new(),
             regexes: Vec::new(),
-            any_predicate: false,
-            any_retry_predicate: false,
         }
     }
 
     fn state(&mut self, graph: &NfaGraph, index: usize, instruction: &InstructionIR) -> StatePlan {
         let label = instruction.label();
-        let origin = match graph
+        let owner = match graph
             .origin(label)
             .expect("every pre-pack label carries an origin")
         {
             LabelOrigin::Expression => {
                 unreachable!("execution expressions are not source-generated")
             }
-            LabelOrigin::Def(_) => StateOrigin::Definition,
-            LabelOrigin::DefSpecialization { route, .. } => {
-                if route.requires_consumption() {
-                    StateOrigin::ConsumingDefinition
-                } else {
-                    StateOrigin::Definition
-                }
-            }
+            LabelOrigin::Def(definition) => definition,
+            LabelOrigin::DefSpecialization { def_id, .. } => def_id,
         };
         let kind = match instruction {
-            InstructionIR::Switch(switch) => StatePlanKind::Switch(
-                self.dumper
-                    .switch_cases(switch)
-                    .into_iter()
-                    .map(|(entry, pattern)| SwitchActionPlan {
-                        kind: entry.kind,
-                        pattern,
-                        prefix: entry
-                            .prefix
-                            .iter()
-                            .map(|instruction| self.effects(&instruction.effects))
-                            .collect(),
-                        action: self.match_action(entry.matched),
-                    })
-                    .collect(),
-            ),
+            InstructionIR::Switch(switch) => {
+                let mut entries = switch.entries(&self.instructions);
+                entries.sort_by_key(|entry| entry.target);
+                StatePlanKind::Switch(
+                    entries
+                        .into_iter()
+                        .map(|entry| SwitchActionPlan {
+                            kind: entry.kind,
+                            prefix: entry
+                                .prefix
+                                .iter()
+                                .map(|instruction| self.effects(&instruction.effects))
+                                .collect(),
+                            action: self.match_action(entry.matched),
+                        })
+                        .collect(),
+                )
+            }
             InstructionIR::Match(instruction) => self.match_state(instruction),
             InstructionIR::Call(instruction) => StatePlanKind::Call(self.call_state(instruction)),
             InstructionIR::Return(return_) => StatePlanKind::Return(return_.port),
@@ -407,8 +556,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         StatePlan {
             id: StateId(u16::try_from(index).expect("validated state count fits u16 ids")),
             label,
-            definition: self.dumper.def_name_of(label).to_string(),
-            origin,
+            owner,
             provenance: self.dumper.render_instruction(instruction),
             kind,
         }
@@ -438,7 +586,6 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             retry,
             kind: self.kind_check(instruction.node_kind),
             action: self.match_action(instruction),
-            candidate_pattern: self.dumper.node_pattern(instruction),
         })
     }
 
@@ -508,8 +655,6 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             checks.push(CheckPlan::NegField(self.record_field(field)));
         }
         if let Some(predicate) = &instruction.predicate {
-            self.any_predicate = true;
-            self.any_retry_predicate |= instruction.nav.is_sibling_search();
             checks.push(CheckPlan::Predicate(self.predicate(predicate)));
         }
         checks
@@ -517,18 +662,17 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
 
     fn kind_check(&mut self, constraint: NodeKindConstraint) -> Option<KindCheck> {
         let id = constraint.kind_id()?;
-        let name = self.kind_name(id);
         if id != NodeKindId::ERROR {
             self.expected_kinds.insert(
                 id,
                 ExpectedKind {
                     id,
-                    name: name.clone(),
+                    name: self.kind_name(id),
                     named: constraint.is_named(),
                 },
             );
         }
-        Some(KindCheck { id, name })
+        Some(KindCheck { id })
     }
 
     fn record_field(&mut self, field: NodeFieldId) -> FieldPlan {
@@ -575,15 +719,12 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
                     let normalized = normalize(&pattern);
                     self.regexes.push(RegexPlan {
                         id,
-                        pattern: pattern.clone(),
+                        pattern,
                         normalized,
                     });
                     id
                 };
-                PredicateValuePlan::Regex {
-                    id,
-                    pattern: pattern.to_string(),
-                }
+                PredicateValuePlan::Regex { id }
             }
         };
         PredicatePlan {
@@ -598,7 +739,6 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             .map(|effect| EffectPlan {
                 kind: effect.kind(),
                 payload: self.effect_payload(effect),
-                display: self.dumper.effect(effect),
             })
             .collect()
     }

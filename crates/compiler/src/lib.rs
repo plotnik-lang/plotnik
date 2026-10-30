@@ -43,16 +43,14 @@ pub mod diagnostics {
     };
 }
 
-pub use crate::compiler::journal_fn_name as matcher_journal_fn_name;
-
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;
 
 pub use crate::compiler::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, DiagnosticBuilder,
     DiagnosticKind, Diagnostics, Emission, EmitConfigError, EmitTarget, Error, FormatError,
-    FormatResult, QueryResult, RustCodegenConfig, RustModuleOutput, RustTypesOutput, Severity,
-    Span,
+    FormatResult, QueryResult, RustCodegenConfig, RustModuleOutput, RustSourceOutput,
+    RustTypesOutput, Severity, Span,
 };
 pub use crate::compiler::{
     CompiledQuery, GrammarDeclaration, GrammarDeclarationError, InputKind, Query, QueryBuilder,

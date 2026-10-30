@@ -1,14 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
+use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::types::capture::{
     CaptureId, CaptureObservation, CaptureProvenance, FieldSource,
 };
+use crate::compiler::analyze::types::public_types::PublicTypes;
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, ListMinimum, PatternFlow, PatternShape,
     RESERVED_NO_VALUE_TYPE_ID, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions};
+use crate::compiler::diagnostics::SourceId;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::{DefId, TypeDeclId};
@@ -19,6 +22,7 @@ use crate::core::Symbol;
 pub struct CustomCaptureTypeOccurrence {
     pub name: Symbol,
     pub span: Span,
+    pub scope: Span,
     pub type_id: TypeId,
 }
 
@@ -146,6 +150,8 @@ pub struct TypeAnalysis {
     pub(super) field_completions: HashMap<Pattern, FieldCompletions>,
 
     named_types: BTreeMap<TypeId, Symbol>,
+
+    public_types: PublicTypes,
 }
 
 #[derive(Clone, Debug)]
@@ -507,6 +513,25 @@ impl TypeAnalysis {
         self.named_types.iter().map(|(&id, &sym)| (id, sym))
     }
 
+    pub(crate) fn public_name(&self, type_id: TypeId) -> Option<Symbol> {
+        match self.expect_type_shape(type_id) {
+            TypeShape::Ref(declaration) => Some(self.declaration_name(*declaration)),
+            _ => self.type_name_of(type_id),
+        }
+    }
+
+    pub(crate) fn public_type(&self, name: Symbol) -> DefinitionOutput {
+        self.public_types.output(name)
+    }
+
+    pub(crate) fn type_source(&self, name: Symbol) -> Result<SourceId, &[Span]> {
+        self.public_types.source(name)
+    }
+
+    pub(crate) fn ownership_uses(&self) -> &[(Span, SourceId)] {
+        self.public_types.uses()
+    }
+
     fn assert_well_formed(&self) {
         assert!(
             matches!(
@@ -688,6 +713,8 @@ pub struct TypeAnalysisBuilder {
 
     type_provenance: HashMap<TypeId, Span>,
 
+    pub(super) type_origins: Vec<(TypeId, Span)>,
+    pub(super) field_origins: HashMap<(TypeId, Symbol, SourceId), Vec<Span>>,
     custom_capture_types: Vec<CustomCaptureTypeOccurrence>,
 
     capture_type_declarations: HashMap<(Symbol, TypeId), TypeDeclId>,
@@ -761,10 +788,13 @@ impl TypeAnalysisBuilder {
                 capture_facts: HashMap::new(),
                 field_completions: HashMap::new(),
                 named_types: BTreeMap::new(),
+                public_types: PublicTypes::default(),
             },
             pattern_shapes: HashMap::new(),
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
+            type_origins: Vec::new(),
+            field_origins: HashMap::new(),
             custom_capture_types: Vec::new(),
             capture_type_declarations: HashMap::new(),
             capture_provenance: CaptureProvenance::default(),
@@ -1176,6 +1206,9 @@ impl TypeAnalysisBuilder {
         for occurrence in &mut self.custom_capture_types {
             occurrence.type_id = remap(occurrence.type_id);
         }
+        for (ty, _) in &mut self.type_origins {
+            *ty = remap(*ty);
+        }
 
         let mut provenance = std::mem::take(&mut self.type_provenance)
             .into_iter()
@@ -1295,6 +1328,7 @@ impl TypeAnalysisBuilder {
 
     pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
         self.type_provenance.entry(type_id).or_insert(span);
+        self.type_origins.push((type_id, span));
     }
 
     pub fn type_provenance(&self, type_id: TypeId) -> Option<Span> {
@@ -1305,8 +1339,42 @@ impl TypeAnalysisBuilder {
         self.custom_capture_types.push(occurrence);
     }
 
+    pub(super) fn discard_result_origins_in(&mut self, span: Span) {
+        self.custom_capture_types.retain(|occurrence| {
+            occurrence.span.source != span.source
+                || !span.range.contains_range(occurrence.span.range)
+        });
+        self.type_origins.retain(|&(_, origin)| {
+            origin.source != span.source || !span.range.contains_range(origin.range)
+        });
+    }
+
     pub fn custom_capture_types(&self) -> &[CustomCaptureTypeOccurrence] {
         &self.custom_capture_types
+    }
+
+    pub(super) fn field_origin(&self, ty: TypeId, name: Symbol, scope: Span) -> Span {
+        let origins = self
+            .field_origins
+            .get(&(ty, name, scope.source))
+            .expect("a public field retains its source origins");
+        let start = origins.partition_point(|span| span.range.start() < scope.range.start());
+        origins[start..]
+            .iter()
+            .copied()
+            .find(|span| scope.range.contains_range(span.range))
+            .expect("a public field retains its capture site in the chosen body")
+    }
+
+    pub(super) fn resolve_public_types(&mut self, definitions: &DefinitionGraph) -> HashSet<Span> {
+        for origins in self.field_origins.values_mut() {
+            origins.sort_unstable_by_key(|span| (span.range.start(), span.range.end()));
+            origins.dedup();
+        }
+
+        let (public_types, ownership_annotations) = PublicTypes::analyze(self, definitions);
+        self.analysis.public_types = public_types;
+        ownership_annotations
     }
 
     pub fn record_pattern_shape(&mut self, pattern: Pattern, shape: PatternShape) {

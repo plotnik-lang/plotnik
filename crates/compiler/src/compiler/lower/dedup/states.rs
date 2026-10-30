@@ -5,16 +5,16 @@ use crate::bytecode::{Nav, NodeKindConstraint};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use crate::compiler::lower::ir::{
-    CallEntry, EffectIR, InstructionIR, Label, MatchIR, NfaGraph, PredicateIR,
+    CallEntry, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph, PredicateIR,
 };
 
 pub fn dedup_states(nfa: &mut NfaGraph) {
     loop {
         dedup_successors(&mut nfa.instructions);
 
-        let mut remap = plan_merges(&nfa.instructions, SuccNorm::SelfLoop);
+        let mut remap = plan_merges(nfa, SuccNorm::SelfLoop);
         if remap.is_empty() {
-            remap = plan_merges(&nfa.instructions, SuccNorm::Raw);
+            remap = plan_merges(nfa, SuccNorm::Raw);
         }
         if remap.is_empty() {
             break;
@@ -101,11 +101,21 @@ impl StateKey {
     }
 }
 
-fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label, Label> {
+fn plan_merges(nfa: &NfaGraph, norm: SuccNorm) -> HashMap<Label, Label> {
     let mut representatives: HashMap<StateKey, Label> = HashMap::new();
     let mut remap: HashMap<Label, Label> = HashMap::new();
+    let definition = |label| match nfa
+        .origin(label)
+        .expect("deduplicated states retain their origin")
+    {
+        LabelOrigin::Expression => None,
+        LabelOrigin::Def(definition)
+        | LabelOrigin::DefSpecialization {
+            def_id: definition, ..
+        } => Some(definition),
+    };
 
-    for instr in instructions {
+    for instr in &nfa.instructions {
         let Some(key) = StateKey::of(instr, norm) else {
             continue;
         };
@@ -114,6 +124,11 @@ fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label,
                 slot.insert(instr.label());
             }
             Entry::Occupied(rep) => {
+                assert_eq!(
+                    definition(instr.label()),
+                    definition(*rep.get()),
+                    "deduplication must not merge states from different definitions"
+                );
                 remap.insert(instr.label(), *rep.get());
             }
         }

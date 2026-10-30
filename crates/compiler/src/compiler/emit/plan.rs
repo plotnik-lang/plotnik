@@ -6,8 +6,8 @@ pub(crate) use super::decode::{
     DecodeCase, DecodeItem, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
 };
 pub(crate) use super::matcher::{
-    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, PredicatePlan,
-    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
+    BlockKind, CallPlan, CheckPlan, DefinitionPlan, EffectPlan, FlowPlan, KindClass, MatchPlan,
+    MatcherPlan, PredicatePlan, PredicateValuePlan, RegexId, StateId, StatePlan, StatePlanKind,
 };
 
 pub(crate) struct CodegenPlan<'a> {

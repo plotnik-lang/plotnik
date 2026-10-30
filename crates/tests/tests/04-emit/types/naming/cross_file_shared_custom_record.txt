@@ -1,0 +1,26 @@
+Q = (program
+  {
+    (identifier) @value :: text
+  }* @entries :: Shared
+)
+--------------- INPUT (other.ptk) ----------------
+Other = (program
+  {
+    (identifier) @value :: text
+  }* @entries :: Shared
+)
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub entries: ::std::vec::Vec<Shared<'s>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Shared<'s> {
+    pub value: &'s str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Other<'s> {
+    pub entries: ::std::vec::Vec<Shared<'s>>,
+}
