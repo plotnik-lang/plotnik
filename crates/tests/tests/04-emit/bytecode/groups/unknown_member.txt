@@ -1,0 +1,10 @@
+Q = (program (function/missing))
+--------------- INPUT (input.txt) ----------------
+------------------ DIAGNOSTICS -------------------
+error: `function/missing` is not a valid node kind
+ --> query.ptk:1:15
+  |
+1 | Q = (program (function/missing))
+  |               ^^^^^^^^^^^^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

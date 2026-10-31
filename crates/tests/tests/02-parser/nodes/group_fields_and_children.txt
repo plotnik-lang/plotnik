@@ -1,0 +1,42 @@
+Q=(expression/call name:(identifier)@name (arguments)@args)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "expression"
+      Slash "/"
+      Id "call"
+      CapturedPattern
+        Field
+          Id "name"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+        Capture
+          CaptureToken "@name"
+      CapturedPattern
+        NamedNode
+          ParenOpen "("
+          Id "arguments"
+          ParenClose ")"
+        Capture
+          CaptureToken "@args"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode expression
+      CapturedPattern
+        FieldPattern name:
+          NamedNode identifier
+        Capture @name
+      CapturedPattern
+        NamedNode arguments
+        Capture @args

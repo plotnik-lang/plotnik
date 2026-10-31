@@ -25,3 +25,4 @@ pub use render::{
 pub(crate) use structure::{NodeRealizer, StepProjection};
 pub use structure::{SkeletonStep, SkeletonVariable, StepTarget, StructureTable, VarId};
 pub use types::Grammar;
+pub(crate) use types::is_group_name;

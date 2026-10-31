@@ -104,9 +104,7 @@ fn class_name(kind: SyntaxKind) -> &'static str {
         | SyntaxKind::StringContent
         | SyntaxKind::StringLiteral
         | SyntaxKind::UnterminatedString => "string",
-        SyntaxKind::RegexLiteral
-        | SyntaxKind::RegexPredicateMatch
-        | SyntaxKind::RegexPredicateNoMatch => "regex",
+        SyntaxKind::RegexLiteral => "regex",
         SyntaxKind::CaptureToken | SyntaxKind::DiscardToken | SyntaxKind::At => "capture",
         SyntaxKind::Id | SyntaxKind::KwError | SyntaxKind::KwMissing => "ident",
         SyntaxKind::Garbage | SyntaxKind::Error => "error",
@@ -129,7 +127,6 @@ fn class_name(kind: SyntaxKind) -> &'static str {
         | SyntaxKind::PlusQuestion
         | SyntaxKind::QuestionQuestion
         | SyntaxKind::Slash
-        | SyntaxKind::Hash
         | SyntaxKind::Comma
         | SyntaxKind::Pipe
         | SyntaxKind::DotBang

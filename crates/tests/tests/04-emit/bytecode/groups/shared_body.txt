@@ -1,0 +1,62 @@
+Q = (program
+  (function
+    parameter: (identifier) @param
+  ) @function
+)
+--------------- INPUT (input.txt) ----------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 02
+
+[transitions]
+Q:
+  01       return
+  02   !   (program)                        10
+  04   !   (_)                              06          [Node RecordSet(function)]
+  05  ─‣┘² _                                01
+  06  └‣─  parameter: (identifier)          05          [Node RecordSet(param)]
+  07   !   (function__regular)              04
+  08   !   (function__arrow)                04
+  09   !   switch
+             (function__regular)            07
+             (function__arrow)              08
+  10  └‣─  (_)                              09
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "function"
+S2 "param"
+S3 "Q"
+S4 "program"
+S5 "function__regular"
+S6 "function__arrow"
+S7 "identifier"
+S8 "parameter"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { function, param }
+
+[type_members]
+M0: S1 → T0  ; function: <Node>
+M1: S2 → T0  ; param: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (function__regular)            07
+             (function__arrow)              10
+  03  └‣─  parameter: (identifier)          05          [Node RecordSet(M1 param)]
+  05  ─‣┘² _                                06
+  06       return
+  07   !   (function__regular)              08
+  08   !   (_)                              03          [Node RecordSet(M0 function)]
+  10   !   (function__arrow)                08

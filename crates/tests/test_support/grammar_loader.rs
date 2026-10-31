@@ -4,6 +4,10 @@ pub fn dart_grammar_json() -> &'static str {
     include_str!(env!("PLOTNIK_TEST_GRAMMAR_DART"))
 }
 
+pub fn groups_grammar_json() -> &'static str {
+    include_str!(env!("PLOTNIK_TEST_GRAMMAR_GROUPS"))
+}
+
 pub fn javascript_grammar_json() -> &'static str {
     include_str!(env!("PLOTNIK_TEST_GRAMMAR_JAVASCRIPT"))
 }

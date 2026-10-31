@@ -1,0 +1,37 @@
+== "#quoted" == '#single'
+=~ /#direct/
+!~ # intervening comment
+/* another comment */ /#after\/#escaped/
+=~ // intervening slash comment
+/#after_slash_comment/
+=~ ; intervening semicolon comment
+/#after_semicolon/
+=~ //) closing parenthesis starts this comment
+/#after_parenthesis/
+=~ //] closing bracket starts this comment
+/#after_bracket/
+!~ //} closing brace starts this comment
+/#after_brace/
+--------------------- TOKENS ---------------------
+OpEq "=="
+DoubleQuote "\""
+StringContent "#quoted"
+DoubleQuote "\""
+OpEq "=="
+SingleQuote "'"
+StringContent "#single"
+SingleQuote "'"
+OpRegexMatch "=~"
+RegexLiteral "/#direct/"
+OpRegexNoMatch "!~"
+RegexLiteral "/#after\\/#escaped/"
+OpRegexMatch "=~"
+RegexLiteral "/#after_slash_comment/"
+OpRegexMatch "=~"
+RegexLiteral "/#after_semicolon/"
+OpRegexMatch "=~"
+RegexLiteral "/#after_parenthesis/"
+OpRegexMatch "=~"
+RegexLiteral "/#after_bracket/"
+OpRegexNoMatch "!~"
+RegexLiteral "/#after_brace/"

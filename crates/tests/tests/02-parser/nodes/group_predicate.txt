@@ -1,0 +1,28 @@
+Q = (literal/string == "#value") @value
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    CapturedPattern
+      NamedNode
+        ParenOpen "("
+        Id "literal"
+        Slash "/"
+        Id "string"
+        NodePredicate
+          OpEq "=="
+          DoubleQuote "\""
+          StringContent "#value"
+          DoubleQuote "\""
+        ParenClose ")"
+      Capture
+        CaptureToken "@value"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    CapturedPattern
+      NamedNode literal
+      Capture @value

@@ -432,6 +432,7 @@ fn language_variant(language: SourceLanguage) -> &'static str {
         SourceLanguage::JavaScript => "JavaScript",
         SourceLanguage::TypeScript => "TypeScript",
         SourceLanguage::Dart => "Dart",
+        SourceLanguage::Groups => "Groups",
     }
 }
 
@@ -440,6 +441,7 @@ fn package_name(language: SourceLanguage) -> &'static str {
         SourceLanguage::JavaScript => "tree-sitter-javascript",
         SourceLanguage::TypeScript => "tree-sitter-typescript",
         SourceLanguage::Dart => "tree-sitter-dart",
+        SourceLanguage::Groups => "tree-sitter-groups",
     }
 }
 
@@ -448,5 +450,6 @@ fn dependency_name(language: SourceLanguage) -> &'static str {
         SourceLanguage::JavaScript => "tree_sitter_javascript",
         SourceLanguage::TypeScript => "tree_sitter_typescript",
         SourceLanguage::Dart => "tree_sitter_dart",
+        SourceLanguage::Groups => "tree_sitter_groups",
     }
 }

@@ -1,0 +1,91 @@
+Q = (program
+  (pair
+    right: (function
+      parameter: (identifier == "keep") @parameter
+    ) @selected
+  )
+)
+--------------- INPUT (input.txt) ----------------
+pair {
+  arrow(keep) => wrong_field;
+  fn chosen(keep) {}
+}
+--------------------- OUTPUT ---------------------
+{
+  "parameter": {
+    "kind": "identifier",
+    "span": [49, 53],
+    "text": "keep"
+  },
+  "selected": {
+    "kind": "function__regular",
+    "span": [39, 57],
+    "text": "fn chosen(keep) {}"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "keep"
+S02 "selected"
+S03 "parameter"
+S04 "Q"
+S05 "program"
+S06 "pair"
+S07 "function__regular"
+S08 "function__arrow"
+S09 "identifier"
+S10 "right"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { selected, parameter }
+
+[type_members]
+M0: S02 → T0  ; selected: <Node>
+M1: S03 → T0  ; parameter: <Node>
+
+[type_names]
+N0: S04 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (pair)                           02
+  02  └‣─  right: (_)                       03
+  03   !   switch
+             (function__regular)            10
+             (function__arrow)              11
+  04  └‣─  parameter: (identifier == "keep")  06        [Node RecordSet(M1 parameter)]
+  06  ─‣┘³ _                                07
+  07       return
+  08   !   (_)                              04          [Node RecordSet(M0 selected)]
+  10   !   (function__regular)              08
+  11   !   (function__arrow)                08
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (pair)                           02
+       ●   (pair)
+  02  └‣─  right: (_)                       03
+       ○   "pair"
+       ○   "{"
+       ○   left: (function__arrow)
+       ●   right: (function__regular)
+  03   ●   switch (function__regular)       10
+  10   !   (function__regular)              08
+       ●   (function__regular)
+  08   !   (_)                              04          [Node RecordSet(M0 selected)]
+       ●   (function__regular)
+  04  └‣─  parameter: (identifier == "keep")  06        [Node RecordSet(M1 parameter)]
+       ○   "fn"
+       ○   name: (identifier) "chosen"
+       ○   "("
+       ●   parameter: (identifier) "keep"
+  06  ─‣┘³ _                                07
+       ●   (program)
+  07   ◀   return                           ◼

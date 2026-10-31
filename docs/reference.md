@@ -5,6 +5,7 @@ Plotnik matches Tree-sitter syntax trees and builds typed results from the parts
 - [A query from tree to result](#a-query-from-tree-to-result)
 - [Match nodes and children](#match-nodes-and-children)
   - [Node kinds and wildcards](#node-kinds-and-wildcards)
+  - [Kind groups](#kind-groups)
   - [Children and sibling sequences](#children-and-sibling-sequences)
   - [Grammar fields](#grammar-fields)
   - [Syntax errors and missing tokens](#syntax-errors-and-missing-tokens)
@@ -96,7 +97,7 @@ Each query application starts at a supplied node. Here, the query follows child 
 
 One application returns the first complete match. If a later part fails, Plotnik backtracks and tries another way to satisfy the query. Repetition collects several values inside that one result.
 
-The examples below use the JavaScript grammar. A block without `Name =` is a pattern fragment to place at the appropriate level of the tree. Node kinds and grammar fields come from the selected source language's grammar.
+Most examples use the JavaScript grammar. A block without `Name =` is a pattern fragment to place at the appropriate level of the tree. Node kinds and grammar fields come from the selected source language's grammar.
 
 ## Match nodes and children
 
@@ -115,7 +116,30 @@ A quoted token matches its grammar kind. To require a named identifier's text to
 
 `(_ ...)` can constrain the children of any named node. Bare `_` matches one node and has no child list.
 
-Abstract grammar supertypes, such as JavaScript's `expression`, are not supported. Use an [alternation](#choose-an-alternative) of concrete kinds.
+### Kind groups
+
+A kind group lets one pattern match several forms of a construct. Consider a grammar with regular, arrow, and method forms in its `function` group:
+
+| Pattern              | Matches                            |
+| -------------------- | ---------------------------------- |
+| `(function)`         | Any member of the `function` group |
+| `(function/regular)` | A regular function                 |
+| `(function/arrow)`   | An arrow function                  |
+| `(function/method)`  | A method                           |
+
+`(function) @fn` captures the concrete function node as a `Node` value.
+
+Write `(group/member)` with one slash and no spaces around it. Both names use lowercase snake_case.
+
+Each member has its own fields and children. A regular function can have a `name` child, while an arrow function has none:
+
+```ptk
+(function name: (identifier) @name)
+```
+
+The pattern selects members with an identifier in their `name` field, including named regular functions. If a pattern requires several fields or children, one node must satisfy all of them.
+
+Plotnik's `(group/member)` is not Tree-sitter's supertype/subtype selector and adds no implicit parent or ancestor constraints. Write structure explicitly with nested patterns, and use an [alternation](#choose-an-alternative) of concrete kinds for Tree-sitter supertypes such as JavaScript's `expression`.
 
 ### Children and sibling sequences
 
@@ -177,6 +201,8 @@ Use `-field` to require that a node has no child in that field:
 
 This matches `let answer`'s declarator, but not `let answer = 42`'s. The position of `-value` among the children does not move through the tree. It tests the enclosing node.
 
+In the [function example](#kind-groups), `(function -name)` matches members with no `name` child, including unnamed regular functions and arrow functions. The grammar must allow the field on at least one member.
+
 A field value describes one child node. A sequence is not a field value, even if its braces contain just one pattern.
 
 Negated fields belong directly inside a node pattern. They cannot be captured, repeated, or used as an alternative by themselves.
@@ -216,6 +242,8 @@ Put a predicate immediately after the node kind to test the node's text:
 
 A failed predicate rejects that candidate node. It does not stop the search for a later candidate. Predicates add matching constraints without changing the result type.
 
+Use text predicates on node kinds that cannot have children. For a kind group, every member must meet this rule. If some members allow children, select a leaf member with `(group/member == "text")`.
+
 Wildcards and definition references cannot take predicates.
 
 Plotnik does not support Tree-sitter's separate predicates or directives, such as `(#eq? @name "answer")` and `#set!`.
@@ -239,7 +267,7 @@ The details that affect matches are:
 - `\b` and `\B` use ASCII word characters, even though the rest of the expression supports Unicode.
 - Parenthesized groups affect regex matching only. They do not create Plotnik result fields.
 
-Backreferences, lookahead, lookbehind, named groups, multiline mode `(?m)`, CRLF mode `(?R)`, and directional or half word boundaries such as `\<` and `\b{start}` are rejected. An empty regex literal `//` is also rejected. A nonempty expression that can match an empty string, such as `/a*/`, is valid.
+Backreferences, lookahead, lookbehind, named groups, multiline mode `(?m)`, CRLF mode `(?R)`, and directional or half word boundaries such as `\<` and `\b{start}` are rejected. `//` starts a line comment. A nonempty expression that can match an empty string, such as `/a*/`, is valid.
 
 ## Shape the result
 
@@ -880,7 +908,7 @@ A `.ptk` file contains named definitions. Each definition has one pattern body. 
 
 Names are case-sensitive. Definitions and custom types start with an ASCII uppercase letter and use letters or digits. Capture names start with an ASCII lowercase letter and use lowercase letters, digits, or underscores. A leading underscore after `@` makes a discard. Capture names cannot use Tree-sitter's dotted form, such as `@function.name`.
 
-An uppercase name in parentheses is a definition reference. Node and field names follow the grammar's spellings, normally snake_case. Definitions must be unique across all files compiled together.
+An uppercase name in parentheses is a definition reference. Ordinary node and field names follow the grammar's spellings, normally snake_case. Use `(group/member)` for a [kind group member](#kind-groups). Definitions must be unique across all files compiled together.
 
 ### Suffix order
 
@@ -910,9 +938,9 @@ Single- and double-quoted strings have the same meaning. They are used for anony
 
 Unicode escape digits are hexadecimal, as in `\u{1F600}`. Other string escapes are errors. Regex literals use regex escaping instead.
 
-`//` and `;` begin line comments. `/* ... */` encloses a block comment.
+`#`, `//`, and `;` begin line comments. `/* ... */` encloses a block comment. Comment markers inside quoted strings and regex literals are literal content.
 
-A first-line comment can tag a file with a language name: `// @javascript`, `; @javascript`, or `/* @javascript */`.
+A first-line comment can tag a file with a language name: `# @javascript`, `// @javascript`, `; @javascript`, or `/* @javascript */`.
 
 ### Check a query
 

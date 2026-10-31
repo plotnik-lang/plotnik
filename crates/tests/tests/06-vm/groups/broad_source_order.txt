@@ -1,0 +1,67 @@
+# Source order wins even though regular is declared before arrow in the grammar.
+Q = (program (function) @first)
+--------------- INPUT (input.txt) ----------------
+plain control;
+arrow() => first;
+fn second() {}
+arrow() => third;
+--------------------- OUTPUT ---------------------
+{
+  "first": {
+    "kind": "function__arrow",
+    "span": [15, 32],
+    "text": "arrow() => first;"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "first"
+S2 "Q"
+S3 "program"
+S4 "function__regular"
+S5 "function__arrow"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { first }
+
+[type_members]
+M0: S1 → T0  ; first: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (_)                               2
+  2   !   switch
+            (function__regular)             7
+            (function__arrow)               8
+  3   !   (_)                               5           [Node RecordSet(M0 first)]
+  5  ─‣┘  _                                 6
+  6       return
+  7   !   (function__regular)               3
+  8   !   (function__arrow)                 3
+--------------------- TRACE ----------------------
+Q:
+  0   !   (program)                         1
+      ●   (program)
+  1  └‣─  (_)                               2
+      ●   (plain)
+  2   ○   switch (plain)
+  1  ❮❮❮
+  1  └‣─  (_)                               2
+      ●   (function__arrow)
+  2   ●   switch (function__arrow)          8
+  8   !   (function__arrow)                 3
+      ●   (function__arrow)
+  3   !   (_)                               5           [Node RecordSet(M0 first)]
+      ●   (function__arrow)
+  5  ─‣┘  _                                 6
+      ●   (program)
+  6   ◀   return                            ◼

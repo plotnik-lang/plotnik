@@ -1,0 +1,19 @@
+Q = (literal/_number)
+------------------ DIAGNOSTICS -------------------
+error: expected an adjacent lowercase snake_case member after `/`
+ --> query.ptk:1:13
+  |
+1 | Q = (literal/_number)
+  |             ^
+
+error: node kinds must be parenthesized
+ --> query.ptk:1:15
+  |
+1 | Q = (literal/_number)
+  |               ^^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (literal/_number)
+1 + Q = (literal/_(number))
+  |

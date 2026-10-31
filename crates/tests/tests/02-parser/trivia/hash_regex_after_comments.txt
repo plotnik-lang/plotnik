@@ -1,0 +1,76 @@
+Q = (identifier =~ # before regex
+  /* block comment */ /#value/)
+R = (identifier !~ // before regex
+  /#other/)
+S = (identifier =~ ; before regex
+  /#semi/)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      Whitespace " "
+      NodePredicate
+        OpRegexMatch "=~"
+        Whitespace " "
+        LineComment "# before regex"
+        Newline "\n"
+        Whitespace "  "
+        BlockComment "/* block comment */"
+        Whitespace " "
+        Regex
+          RegexLiteral "/#value/"
+      ParenClose ")"
+  Newline "\n"
+  Def
+    Id "R"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      Whitespace " "
+      NodePredicate
+        OpRegexNoMatch "!~"
+        Whitespace " "
+        LineComment "// before regex"
+        Newline "\n"
+        Whitespace "  "
+        Regex
+          RegexLiteral "/#other/"
+      ParenClose ")"
+  Newline "\n"
+  Def
+    Id "S"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      Whitespace " "
+      NodePredicate
+        OpRegexMatch "=~"
+        Whitespace " "
+        LineComment "; before regex"
+        Newline "\n"
+        Whitespace "  "
+        Regex
+          RegexLiteral "/#semi/"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier
+  Def R
+    NamedNode identifier
+  Def S
+    NamedNode identifier

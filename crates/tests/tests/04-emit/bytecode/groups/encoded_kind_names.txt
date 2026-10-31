@@ -1,0 +1,36 @@
+Direct = (program (function__arrow))
+Optional = (program (comment__line)?)
+Missing = (program (MISSING comment__block))
+--------------- INPUT (input.txt) ----------------
+------------------ DIAGNOSTICS -------------------
+error: `function__arrow` is not a valid node selector
+ --> query.ptk:1:20
+  |
+1 | Direct = (program (function__arrow))
+  |                    ^^^^^^^^^^^^^^^
+  |
+help: write `function/arrow`
+  |
+1 - Direct = (program (function__arrow))
+1 + Direct = (program (function/arrow))
+  |
+
+error: `comment__line` is not a valid node selector
+ --> query.ptk:2:22
+  |
+2 | Optional = (program (comment__line)?)
+  |                      ^^^^^^^^^^^^^
+  |
+help: write `comment/line`
+  |
+2 - Optional = (program (comment__line)?)
+2 + Optional = (program (comment/line)?)
+  |
+
+error: `comment__block` is not a valid node kind
+ --> query.ptk:3:29
+  |
+3 | Missing = (program (MISSING comment__block))
+  |                             ^^^^^^^^^^^^^^
+  |
+help: if this file is for another language, set its first-line language tag

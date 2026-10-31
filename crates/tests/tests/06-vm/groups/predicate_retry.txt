@@ -1,0 +1,78 @@
+Q = (program
+  (comment =~ /chosen/ //) closing parenthesis starts this comment
+    //] closing bracket starts this comment
+    //} closing brace starts this comment
+  ) @chosen
+)
+--------------- INPUT (input.txt) ----------------
+/* rejected */
+// chosen
+plain control;
+--------------------- OUTPUT ---------------------
+{
+  "chosen": {
+    "kind": "comment__line",
+    "span": [15, 24],
+    "text": "// chosen"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "chosen"
+S2 "Q"
+S3 "program"
+S4 "comment__line"
+S5 "comment__block"
+
+[regex]
+R1 /chosen/
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { chosen }
+
+[type_members]
+M0: S1 → T0  ; chosen: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (_)                               2
+  2   !   switch
+            (comment__line)                 7
+            (comment__block)                8
+  3   !   (_ =~ /chosen/)                   5           [Node RecordSet(M0 chosen)]
+  5  ─‣┘  _                                 6
+  6       return
+  7   !   (comment__line)                   3
+  8   !   (comment__block)                  3
+--------------------- TRACE ----------------------
+Q:
+  0   !   (program)                         1
+      ●   (program)
+  1  └‣─  (_)                               2
+      ●   (comment__block)
+  2   ●   switch (comment__block)           8
+  8   !   (comment__block)                  3
+      ●   (comment__block)
+  3   !   (_ =~ /chosen/)                   5           [Node RecordSet(M0 chosen)]
+      ○   (comment__block) "/* rejected */"
+      ○   no candidate
+  1  ❮❮❮
+  1  └‣─  (_)                               2
+      ●   (comment__line)
+  2   ●   switch (comment__line)            7
+  7   !   (comment__line)                   3
+      ●   (comment__line)
+  3   !   (_ =~ /chosen/)                   5           [Node RecordSet(M0 chosen)]
+      ●   (comment__line) "// chosen"
+  5  ─‣┘  _                                 6
+      ●   (program)
+  6   ◀   return                            ◼

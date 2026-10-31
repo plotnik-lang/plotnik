@@ -8,28 +8,13 @@ use crate::compiler::parse::token_set::{
     ALT_RECOVERY_TOKENS, NODE_RECOVERY_TOKENS, PATTERN_FIRST_TOKENS, PREDICATE_OPS, SEPARATORS,
     SEQ_RECOVERY_TOKENS, TokenSet,
 };
+use crate::core::grammar::is_group_name;
 
 use super::utils::{starts_uppercase, to_pascal_case};
 
 enum ParenHead<'q> {
     Concrete,
     DefRef(&'q str),
-}
-
-#[derive(Default)]
-struct TreeSitterPredicateArguments<'q> {
-    target: Option<&'q str>,
-    value: Option<&'q str>,
-}
-
-fn predicate_operator(name: &str) -> Option<&'static str> {
-    match name {
-        "eq" => Some("=="),
-        "not-eq" => Some("!="),
-        "match" => Some("=~"),
-        "not-match" => Some("!~"),
-        _ => None,
-    }
 }
 
 impl<'q> Parser<'q, '_> {
@@ -60,10 +45,6 @@ impl<'q> Parser<'q, '_> {
                 return;
             }
             _ => {
-                if self.at_ts_predicate() {
-                    self.parse_node_predicate_error(checkpoint);
-                    return;
-                }
                 if self.at_ts(PATTERN_FIRST_TOKENS) {
                     self.start_node_at(checkpoint, SyntaxKind::Sequence);
                     tree_sitter_sequence = true;
@@ -92,23 +73,13 @@ impl<'q> Parser<'q, '_> {
             ParenHead::Concrete
         };
 
-        let head = if let Some(sep) = self.tokens.get(self.pos).copied()
-            && matches!(sep.kind, SyntaxKind::Slash | SyntaxKind::Hash)
+        if let Some(sep) = self.tokens.get(self.pos).copied()
+            && sep.kind == SyntaxKind::Slash
             && sep.span.start() == head_end
+            && matches!(head, ParenHead::Concrete)
         {
-            match head {
-                ParenHead::Concrete => {
-                    self.parse_concrete_category_refinement(sep.kind);
-                    ParenHead::Concrete
-                }
-                ParenHead::DefRef(_) => {
-                    self.reject_ref_category_refinement(checkpoint, sep.kind);
-                    ParenHead::Concrete
-                }
-            }
-        } else {
-            head
-        };
+            self.parse_group_member(name);
+        }
 
         if matches!(head, ParenHead::Concrete) && self.at_ts(PREDICATE_OPS) {
             self.parse_node_predicate(name);
@@ -117,226 +88,35 @@ impl<'q> Parser<'q, '_> {
         head
     }
 
-    fn parse_concrete_category_refinement(&mut self, sep: SyntaxKind) {
-        let sep_span = self.current_span();
-        let has_subtype = self.consume_category_refinement_subtype(sep_span);
-
-        if sep != SyntaxKind::Slash {
-            return;
-        }
-
-        if has_subtype {
-            if let Some(report) = self.report_at(DiagnosticKind::SupertypeSlashDeprecated, sep_span)
-            {
-                report.fix("use `#`", "#").emit();
-            }
-            return;
-        }
-
-        if let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype) {
+    fn parse_group_member(&mut self, group: &str) {
+        let slash = self.current_span();
+        if !is_group_name(group)
+            && let Some(report) = self.report_at(DiagnosticKind::UnexpectedToken, slash)
+        {
             report
-                .detail("`/` must be followed immediately by a subtype")
+                .detail("group names must be lowercase snake_case")
                 .emit();
         }
-    }
-
-    fn reject_ref_category_refinement(&mut self, checkpoint: Checkpoint, sep: SyntaxKind) {
-        self.start_node_at(checkpoint, SyntaxKind::NamedNode);
-        if let Some(report) = self.report_current(DiagnosticKind::InvalidSupertypeSyntax) {
-            report.emit();
-        }
-
-        let sep_span = self.current_span();
-        let has_subtype = self.consume_category_refinement_subtype(sep_span);
-
-        if sep == SyntaxKind::Slash
-            && !has_subtype
-            && let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype)
-        {
-            report.emit();
-        }
-    }
-
-    fn consume_category_refinement_subtype(&mut self, sep_span: TextRange) -> bool {
         self.bump();
-        let subtype = self.tokens.get(self.pos).copied();
-        let tight = subtype.is_some_and(|t| t.span.start() == sep_span.end());
-        match subtype.map(|t| t.kind) {
-            Some(SyntaxKind::Id) if tight => {
-                self.bump();
-                true
-            }
-            Some(SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote) if tight => {
-                self.skip_string_tokens();
-                true
-            }
-            _ => false,
-        }
-    }
-
-    pub(crate) fn at_ts_predicate(&mut self) -> bool {
-        if self.current() != SyntaxKind::Hash {
-            return false;
-        }
-        let hash_end = self.current_span().end();
-        let Some(id) = self.tokens.get(self.pos + 1).copied() else {
-            return false;
-        };
-        if id.kind != SyntaxKind::Id || id.span.start() != hash_end {
-            return false;
-        }
-        self.tokens.get(self.pos + 2).is_some_and(|t| {
-            matches!(t.kind, SyntaxKind::Question | SyntaxKind::Negation)
-                && t.span.start() == id.span.end()
-        })
-    }
-
-    pub(crate) fn error_unsupported_predicate(&mut self) {
-        self.start_node(SyntaxKind::Error);
-        let (span, name) = self.consume_predicate_name();
-        let arguments = self.inspect_tree_sitter_predicate_arguments();
-        self.consume_tree_sitter_predicate_arguments(&arguments);
-        self.finish_node();
-
-        self.report_unsupported_predicate(span, name, arguments);
-    }
-
-    fn consume_predicate_name(&mut self) -> (TextRange, &'q str) {
-        let start = self.current_span().start();
-        self.bump();
-        let name = self.current_text();
-        let mut end = self.current_span().end();
-        self.bump();
-        if let Some(suffix) = self.tokens.get(self.pos).copied()
-            && matches!(suffix.kind, SyntaxKind::Question | SyntaxKind::Negation)
-            && suffix.span.start() == end
+        let member = self.tokens.get(self.pos).copied();
+        if !member
+            .is_some_and(|token| token.kind == SyntaxKind::Id && token.span.start() == slash.end())
         {
-            self.bump();
-            end = suffix.span.end();
-        }
-        (TextRange::new(start, end), name)
-    }
-
-    fn parse_node_predicate_error(&mut self, checkpoint: Checkpoint) {
-        self.start_node_at(checkpoint, SyntaxKind::Error);
-        let (span, name) = self.consume_predicate_name();
-        let arguments = self.inspect_tree_sitter_predicate_arguments();
-        self.consume_until_matching_paren();
-        self.pop_delimiter();
-        self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
-        self.finish_node();
-        self.report_unsupported_predicate(span, name, arguments);
-    }
-
-    fn inspect_tree_sitter_predicate_arguments(&mut self) -> TreeSitterPredicateArguments<'q> {
-        self.skip_trivia_to_buffer();
-        let mut pos = self.pos;
-        let mut arguments = TreeSitterPredicateArguments::default();
-
-        if let Some(token) = self.tokens.get(pos)
-            && token.kind == SyntaxKind::CaptureToken
-        {
-            arguments.target = Some(self.source_text(token.span));
-            pos += 1;
-        }
-
-        while self
-            .tokens
-            .get(pos)
-            .is_some_and(|token| token.kind.is_trivia())
-        {
-            pos += 1;
-        }
-        let Some(value) = self.tokens.get(pos) else {
-            return arguments;
-        };
-        match value.kind {
-            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
-                let quote = value.kind;
-                let start = value.span.start();
-                pos += 1;
-                while let Some(token) = self.tokens.get(pos) {
-                    if token.kind == quote {
-                        arguments.value =
-                            Some(self.source_text(TextRange::new(start, token.span.end())));
-                        break;
-                    }
-                    pos += 1;
-                }
+            if let Some(report) = self.report_at(DiagnosticKind::UnexpectedToken, slash) {
+                report
+                    .detail("expected an adjacent lowercase snake_case member after `/`")
+                    .emit();
             }
-            SyntaxKind::RegexLiteral => {
-                arguments.value = Some(self.source_text(value.span));
-            }
-            _ => {}
-        }
-        arguments
-    }
-
-    fn consume_tree_sitter_predicate_arguments(
-        &mut self,
-        arguments: &TreeSitterPredicateArguments<'_>,
-    ) {
-        if arguments.target.is_some() {
-            self.bump();
-        }
-        if arguments.value.is_none() {
             return;
         }
-        match self.current() {
-            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.skip_string_tokens(),
-            SyntaxKind::RegexLiteral => self.bump(),
-            _ => unreachable!("inspected predicate value remains current"),
+        if !is_group_name(self.current_text())
+            && let Some(report) = self.report_current(DiagnosticKind::UnexpectedToken)
+        {
+            report
+                .detail("member names must be lowercase snake_case")
+                .emit();
         }
-    }
-
-    fn consume_until_matching_paren(&mut self) {
-        let mut depth = 0u32;
-        while !self.eof() && !self.has_fatal_error() {
-            match self.current() {
-                SyntaxKind::ParenOpen | SyntaxKind::BracketOpen | SyntaxKind::BraceOpen => {
-                    depth += 1;
-                }
-                SyntaxKind::ParenClose | SyntaxKind::BracketClose | SyntaxKind::BraceClose => {
-                    if depth == 0 {
-                        break;
-                    }
-                    depth -= 1;
-                }
-                _ => {}
-            }
-            self.bump();
-        }
-    }
-
-    fn report_unsupported_predicate(
-        &mut self,
-        span: TextRange,
-        name: &str,
-        arguments: TreeSitterPredicateArguments<'_>,
-    ) {
-        let hint = match (predicate_operator(name), arguments.target, arguments.value) {
-            (Some(operator @ ("==" | "!=")), Some(target), Some(value)) => Some(format!(
-                "move `{operator} {value}` into the node pattern captured as `{target}`"
-            )),
-            (Some(operator @ ("=~" | "!~")), Some(target), Some(value)) => Some(format!(
-                "move a `{operator}` predicate for {value} into the node pattern captured as `{target}`"
-            )),
-            (Some(operator), Some(target), None) => Some(format!(
-                "`#{name}?` corresponds to `{operator}` inside the node pattern captured as `{target}`, but this call has no value"
-            )),
-            (Some(operator), _, _) => Some(format!(
-                "`#{name}?` corresponds to `{operator}` inside a node pattern, but this call does not provide both a captured target and a compatible value"
-            )),
-            (None, _, _) => None,
-        };
-        let Some(report) = self.report_at(DiagnosticKind::UnsupportedPredicate, span) else {
-            return;
-        };
-
-        match hint {
-            Some(hint) => report.hint(hint).emit(),
-            None => report.emit(),
-        }
+        self.bump();
     }
 
     fn parse_node_predicate(&mut self, node_name: &str) {
@@ -567,10 +347,6 @@ impl<'q> Parser<'q, '_> {
                 self.parse_pattern();
                 continue;
             }
-            if self.at_ts_predicate() {
-                self.error_unsupported_predicate();
-                continue;
-            }
             if self.at_ts(recovery) {
                 break;
             }
@@ -588,7 +364,6 @@ impl<'q> Parser<'q, '_> {
                 || parser.at_ts(SEPARATORS)
                 || parser.at_ts(PATTERN_FIRST_TOKENS)
                 || parser.at_ts(recovery)
-                || parser.at_ts_predicate()
         }) else {
             return;
         };
@@ -649,10 +424,6 @@ impl<'q> Parser<'q, '_> {
                 self.parse_rejected_positional(DiagnosticKind::NegatedFieldInAlternation);
                 continue;
             }
-            if self.at_ts_predicate() {
-                self.error_unsupported_predicate();
-                continue;
-            }
             if self.at_ts(PATTERN_FIRST_TOKENS) {
                 self.start_node(SyntaxKind::Alternative);
                 self.parse_pattern();
@@ -672,7 +443,6 @@ impl<'q> Parser<'q, '_> {
                 || parser.at_ts(SEPARATORS)
                 || (parser.at(SyntaxKind::Id) && parser.next_is(SyntaxKind::Colon))
                 || matches!(parser.current(), SyntaxKind::Dot | SyntaxKind::DotBang)
-                || parser.at_ts_predicate()
                 || parser.at_ts(PATTERN_FIRST_TOKENS)
                 || parser.at_ts(ALT_RECOVERY_TOKENS)
         }) else {

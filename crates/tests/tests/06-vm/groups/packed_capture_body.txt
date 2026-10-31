@@ -1,0 +1,146 @@
+Q = (program
+  {
+    {
+      {
+        {
+          {
+            {
+              {
+                {
+                  {
+                    (function) @a
+                  } @i
+                } @b
+              } @c
+            } @d
+          } @e
+        } @f
+      } @g
+    } @h
+  }
+)
+--------------- INPUT (input.txt) ----------------
+plain control;
+arrow() => chosen;
+fn later() {}
+--------------------- OUTPUT ---------------------
+{
+  "h": {
+    "g": {
+      "f": {
+        "e": {
+          "d": {
+            "c": {
+              "b": {
+                "i": {
+                  "a": {
+                    "kind": "function__arrow",
+                    "span": [15, 33],
+                    "text": "arrow() => chosen;"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "i"
+S03 "b"
+S04 "c"
+S05 "d"
+S06 "e"
+S07 "f"
+S08 "g"
+S09 "h"
+S10 "QHGFEDCBI"
+S11 "QHGFEDCB"
+S12 "QHGFEDC"
+S13 "QHGFED"
+S14 "QHGFE"
+S15 "QHGF"
+S16 "QHG"
+S17 "QH"
+S18 "Q"
+S19 "program"
+S20 "function__regular"
+S21 "function__arrow"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { i }
+T3 = Record  M2:1  ; { b }
+T4 = Record  M3:1  ; { c }
+T5 = Record  M4:1  ; { d }
+T6 = Record  M5:1  ; { e }
+T7 = Record  M6:1  ; { f }
+T8 = Record  M7:1  ; { g }
+T9 = Record  M8:1  ; { h }
+
+[type_members]
+M0: S01 → T0  ; a: <Node>
+M1: S02 → T1  ; i: QHGFEDCBI
+M2: S03 → T2  ; b: QHGFEDCB
+M3: S04 → T3  ; c: QHGFEDC
+M4: S05 → T4  ; d: QHGFED
+M5: S06 → T5  ; e: QHGFE
+M6: S07 → T6  ; f: QHGF
+M7: S08 → T7  ; g: QHG
+M8: S09 → T8  ; h: QH
+
+[type_names]
+N0: S10 → T1  ; QHGFEDCBI
+N1: S11 → T2  ; QHGFEDCB
+N2: S12 → T3  ; QHGFEDC
+N3: S13 → T4  ; QHGFED
+N4: S14 → T5  ; QHGFE
+N5: S15 → T6  ; QHGF
+N6: S16 → T7  ; QHG
+N7: S17 → T8  ; QH
+N8: S18 → T9  ; Q
+
+[entrypoints]
+Q = 00 :: T9
+
+[instructions]
+Q:
+  00   !   (program)                        03          [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]
+  03  └‣─  (_)                              05          [RecordOpen]
+  05   !   switch
+             (function__regular)            11
+             (function__arrow)              12
+  06  -ε-                                   08          [RecordSet(M7 g)]
+  08  ─‣┘  _                                10          [RecordClose RecordSet(M8 h)]
+  10       return
+  11   !   (function__regular)              16
+  12   !   (function__arrow)                16
+  13  ...
+  14  ...
+  15  ...
+  16   !   (_)                              06          [Node RecordSet(M0 a) RecordClose RecordSet(M1 i) RecordClose RecordSet(M2 b) RecordClose RecordSet(M3 c) RecordClose RecordSet(M4 d) RecordClose RecordSet(M5 e) RecordClose RecordSet(M6 f) RecordClose]
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        03          [RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen RecordOpen]
+       ●   (program)
+  03  └‣─  (_)                              05          [RecordOpen]
+       ●   (plain)
+  05   ○   switch (plain)
+  03  ❮❮❮
+  03  └‣─  (_)                              05          [RecordOpen]
+       ●   (function__arrow)
+  05   ●   switch (function__arrow)         12
+  12   !   (function__arrow)                16
+       ●   (function__arrow)
+  16   !   (_)                              06          [Node RecordSet(M0 a) RecordClose RecordSet(M1 i) RecordClose RecordSet(M2 b) RecordClose RecordSet(M3 c) RecordClose RecordSet(M4 d) RecordClose RecordSet(M5 e) RecordClose RecordSet(M6 f) RecordClose]
+       ●   (function__arrow)
+  06  -ε-                                   08          [RecordSet(M7 g)]
+  08  ─‣┘  _                                10          [RecordClose RecordSet(M8 h)]
+       ●   (program)
+  10   ◀   return                           ◼

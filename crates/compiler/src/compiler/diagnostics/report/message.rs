@@ -16,7 +16,6 @@ pub enum DiagnosticKind {
     ExpectedExpression,
     ExpectedCaptureType,
     ExpectedGrammarFieldName,
-    ExpectedSubtype,
     ExpectedPredicateValue,
     InvalidGrammarDeclaration,
 
@@ -36,13 +35,11 @@ pub enum DiagnosticKind {
     CapturedNegatedField,
     NegatedFieldAsGrammarFieldValue,
     InvalidGrammarFieldEquals,
-    InvalidSupertypeSyntax,
     InvalidCaptureTypeSyntax,
     ErrorTakesNoArguments,
     MissingTakesNoChildren,
     RefCannotHaveChildren,
     ErrorMissingOutsideParens,
-    UnsupportedPredicate,
     UnexpectedToken,
     CaptureWithoutTarget,
     CaptureTypeWithoutCapture,
@@ -54,7 +51,6 @@ pub enum DiagnosticKind {
     CaptureTypeNameInvalid,
     TreeSitterSequenceSyntaxDeprecated,
     NegationSyntaxDeprecated,
-    SupertypeSlashDeprecated,
 
     DuplicateDefinition,
     UndefinedReference,
@@ -87,7 +83,6 @@ pub enum DiagnosticKind {
     PredicateOnNonLeaf,
     UnknownStringEscape,
     InvalidUnicodeEscape,
-    EmptyRegex,
     RegexBackreference,
     RegexLookaround,
     RegexNamedCapture,
@@ -97,13 +92,13 @@ pub enum DiagnosticKind {
     RegexSyntaxError,
     PredicateValueMismatch,
 
+    InvalidNodeSelector,
     UnknownNodeKind,
     MissingKindNotToken,
     UnknownGrammarField,
     GrammarFieldNotOnNodeKind,
     InvalidGrammarFieldChildKind,
     InvalidChildType,
-    UnsupportedSupertype,
     BareSupertype,
     ChildUnderLeafToken,
     NegatedRequiredField,
@@ -126,8 +121,7 @@ impl DiagnosticKind {
             | Self::InspectionSpansDegraded
             | Self::EntrypointNeverMatchesRoot
             | Self::TreeSitterSequenceSyntaxDeprecated
-            | Self::NegationSyntaxDeprecated
-            | Self::SupertypeSlashDeprecated => Severity::Warning,
+            | Self::NegationSyntaxDeprecated => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -159,7 +153,6 @@ impl DiagnosticKind {
             Self::ExpectedExpression
                 | Self::ExpectedCaptureType
                 | Self::ExpectedGrammarFieldName
-                | Self::ExpectedSubtype
                 | Self::ExpectedPredicateValue
         )
     }
@@ -252,9 +245,6 @@ impl DiagnosticKind {
             Self::InvalidUnicodeEscape => {
                 r"write `\u{…}` with 1-6 hex digits naming a Unicode scalar value"
             }
-            Self::EmptyRegex => {
-                "put a pattern between the slashes, or use a quoted value with a string predicate operator"
-            }
             Self::RegexBackreference => {
                 "the portable regex subset excludes backreferences. Rewrite the pattern without `\\1`"
             }
@@ -269,9 +259,6 @@ impl DiagnosticKind {
             }
             Self::RegexBoundaryVariant => {
                 "use `\\b` or `\\B`, which Plotnik defines as ASCII word boundaries on every target"
-            }
-            Self::InvalidSupertypeSyntax => {
-                "category refinement applies to node kinds, not definition references. Remove the refinement or apply it to a concrete node kind"
             }
             Self::ErrorTakesNoArguments => {
                 "`(ERROR)` matches any error node as a leaf. Use `MISSING` when matching a token inserted by parser recovery"
@@ -302,7 +289,6 @@ impl DiagnosticKind {
             Self::ExpectedExpression => "expected an expression",
             Self::ExpectedCaptureType => "expected a capture type after `::`",
             Self::ExpectedGrammarFieldName => "expected a grammar field name",
-            Self::ExpectedSubtype => "expected a subtype after `#`",
             Self::ExpectedPredicateValue => "expected a string or regex after the operator",
             Self::EmptyTree => "empty `()` matches nothing",
             Self::EmptyAnonymousNode => "empty string matches nothing",
@@ -324,7 +310,6 @@ impl DiagnosticKind {
                 "a negated grammar field cannot be a grammar-field value"
             }
             Self::InvalidGrammarFieldEquals => "grammar fields use `:`, not `=`",
-            Self::InvalidSupertypeSyntax => "references cannot have supertypes",
             Self::InvalidCaptureTypeSyntax => "capture types use `::`, not `:`",
             Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
             Self::MissingTakesNoChildren => {
@@ -332,7 +317,6 @@ impl DiagnosticKind {
             }
             Self::RefCannotHaveChildren => "references cannot have children",
             Self::ErrorMissingOutsideParens => "`ERROR` and `MISSING` must be parenthesized",
-            Self::UnsupportedPredicate => "Tree-sitter predicates are not supported",
             Self::UnexpectedToken => "unexpected token",
             Self::CaptureWithoutTarget => "expected a capture name after `@`",
             Self::CaptureTypeWithoutCapture => "capture type has no capture",
@@ -347,7 +331,6 @@ impl DiagnosticKind {
                 "parenthesized sequences are Tree-sitter syntax"
             }
             Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
-            Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are Tree-sitter syntax",
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAlternativeLabels => {
@@ -387,7 +370,6 @@ impl DiagnosticKind {
             }
             Self::UnknownStringEscape => "unknown escape sequence in string",
             Self::InvalidUnicodeEscape => "invalid unicode escape",
-            Self::EmptyRegex => "empty regex pattern",
             Self::RegexBackreference => "backreferences are not supported in regex",
             Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",
             Self::RegexNamedCapture => "named captures are not supported in regex",
@@ -402,13 +384,13 @@ impl DiagnosticKind {
             }
             Self::RegexSyntaxError => "invalid regex syntax",
             Self::PredicateValueMismatch => "predicate operator and value do not match",
+            Self::InvalidNodeSelector => "invalid node selector",
             Self::UnknownNodeKind => "unknown node kind",
             Self::MissingKindNotToken => "this kind is never inserted as a missing node",
             Self::UnknownGrammarField => "unknown grammar field",
             Self::GrammarFieldNotOnNodeKind => "grammar field not valid on this node kind",
             Self::InvalidGrammarFieldChildKind => "node kind not valid for this grammar field",
             Self::InvalidChildType => "node kind not valid as child",
-            Self::UnsupportedSupertype => "matching a supertype is not supported yet",
             Self::BareSupertype => "supertype is not a matchable node kind",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this grammar field is always present",
@@ -426,7 +408,7 @@ impl DiagnosticKind {
     pub fn template(&self) -> String {
         match self {
             Self::UnexpectedToken | Self::BareIdentifier => "{}".to_string(),
-            Self::ExpectedSubtype | Self::TreeSitterSequenceSyntaxDeprecated => "{}".to_string(),
+            Self::TreeSitterSequenceSyntaxDeprecated => "{}".to_string(),
 
             Self::RefCannotHaveChildren => {
                 "`{}` is a reference and cannot have children".to_string()
@@ -459,15 +441,13 @@ impl DiagnosticKind {
             Self::IncompatibleRecordShapes => {
                 "capture `@{}` has incompatible record fields across alternatives".to_string()
             }
+            Self::InvalidNodeSelector => "`{}` is not a valid node selector".to_string(),
             Self::UnknownNodeKind => "`{}` is not a valid node kind".to_string(),
             Self::MissingKindNotToken => {
                 "`{}` is not a token kind. Only tokens can be missing nodes".to_string()
             }
             Self::UnknownGrammarField => "`{}` is not a valid grammar field".to_string(),
             Self::InvalidGrammarFieldChildKind => "{}".to_string(),
-            Self::UnsupportedSupertype => {
-                "matching the `{}#` supertype is not supported yet".to_string()
-            }
             Self::BareSupertype => "`{}` is a supertype, not a node kind".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token and has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),

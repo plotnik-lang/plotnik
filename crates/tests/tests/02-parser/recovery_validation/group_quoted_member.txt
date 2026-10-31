@@ -1,0 +1,7 @@
+Q = (literal/"number")
+------------------ DIAGNOSTICS -------------------
+error: expected an adjacent lowercase snake_case member after `/`
+ --> query.ptk:1:13
+  |
+1 | Q = (literal/"number")
+  |             ^

@@ -106,6 +106,7 @@ fn case_from_fixture(relative: &str, fixture: Fixture) -> Result<Option<Case>, S
             SourceLanguage::JavaScript => env!("PLOTNIK_TEST_GRAMMAR_JAVASCRIPT"),
             SourceLanguage::TypeScript => env!("PLOTNIK_TEST_GRAMMAR_TYPESCRIPT"),
             SourceLanguage::Dart => env!("PLOTNIK_TEST_GRAMMAR_DART"),
+            SourceLanguage::Groups => env!("PLOTNIK_TEST_GRAMMAR_GROUPS"),
         }),
         expected,
     }))

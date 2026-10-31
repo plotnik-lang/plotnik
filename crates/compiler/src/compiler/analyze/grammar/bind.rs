@@ -39,6 +39,7 @@ impl<'q> GrammarBindInput<'_, 'q> {
         } = self;
 
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
+        let mut named_selectors: HashMap<String, Option<Vec<NodeKindId>>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
         let expression_calls = expression
             .into_iter()
@@ -54,6 +55,7 @@ impl<'q> GrammarBindInput<'_, 'q> {
                 expression_calls,
                 strict_lints,
                 node_kind_ids: &mut node_kind_ids,
+                named_selectors: &mut named_selectors,
                 node_field_ids: &mut node_field_ids,
                 output,
                 diag: diagnostics,
@@ -83,8 +85,8 @@ impl<'q> GrammarBindInput<'_, 'q> {
             grammar,
             definitions,
             pattern_facts,
-            source_map,
             &node_kind_ids,
+            &named_selectors,
             &node_field_ids,
             expression,
         );
@@ -107,6 +109,7 @@ pub(super) struct GrammarBinder<'a, 'q> {
     expression_calls: HashSet<DefId>,
     pub(super) strict_lints: bool,
     pub(super) node_kind_ids: &'a mut HashMap<NodeKind<&'q str>, Option<NodeKindId>>,
+    pub(super) named_selectors: &'a mut HashMap<String, Option<Vec<NodeKindId>>>,
     pub(super) node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     pub(super) output: &'a mut GrammarBindingBuilder,
     pub(super) diag: &'a mut Diagnostics,

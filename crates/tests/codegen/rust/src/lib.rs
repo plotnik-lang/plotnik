@@ -5,6 +5,7 @@ pub enum Language {
     JavaScript,
     TypeScript,
     Dart,
+    Groups,
 }
 
 #[must_use]
@@ -13,6 +14,7 @@ pub fn parse(language: Language, source: &str) -> Tree {
         Language::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
         Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
         Language::Dart => tree_sitter_dart::LANGUAGE.into(),
+        Language::Groups => tree_sitter_groups::LANGUAGE.into(),
     };
     let mut parser = Parser::new();
     parser

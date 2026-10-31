@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 const GRAMMARS: &[(&str, &str, &str)] = &[
     ("tree_sitter_dart", "DART", "src/grammar.json"),
+    ("tree_sitter_groups", "GROUPS", "src/grammar.json"),
     ("tree_sitter_javascript", "JAVASCRIPT", "src/grammar.json"),
     (
         "tree_sitter_typescript",

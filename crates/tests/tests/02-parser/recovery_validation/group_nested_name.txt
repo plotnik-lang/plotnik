@@ -1,0 +1,7 @@
+Q = (comment/line__nested)
+------------------ DIAGNOSTICS -------------------
+error: member names must be lowercase snake_case
+ --> query.ptk:1:14
+  |
+1 | Q = (comment/line__nested)
+  |              ^^^^^^^^^^^^

@@ -45,8 +45,26 @@ pub fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::with_capacity(source.len() / 4 + 8);
     let mut lexer = SyntaxKind::lexer(source);
     let mut error_start: Option<usize> = None;
+    let mut expects_regex = false;
 
     loop {
+        let remaining = lexer.remainder();
+        if expects_regex
+            && remaining.starts_with('/')
+            && !remaining.starts_with("/*")
+            && !remaining.starts_with("//")
+        {
+            let start = source.len() - remaining.len();
+            let len = regex_literal_len(remaining);
+            lexer.bump(len);
+            tokens.push(Token::new(
+                SyntaxKind::RegexLiteral,
+                range_to_text_range(start..start + len),
+            ));
+            expects_regex = false;
+            continue;
+        }
+
         match lexer.next() {
             Some(Ok(kind)) => {
                 if let Some(start) = error_start.take() {
@@ -58,23 +76,13 @@ pub fn lex(source: &str) -> Vec<Token> {
                 }
 
                 let span = lexer.span();
+                if !kind.is_trivia() {
+                    expects_regex =
+                        matches!(kind, SyntaxKind::OpRegexMatch | SyntaxKind::OpRegexNoMatch);
+                }
                 match kind {
                     SyntaxKind::StringLiteral => {
                         split_string_literal(Lexeme::new(source, span), &mut tokens);
-                    }
-                    SyntaxKind::RegexPredicateMatch => {
-                        split_regex_predicate(
-                            Lexeme::new(source, span),
-                            SyntaxKind::OpRegexMatch,
-                            &mut tokens,
-                        );
-                    }
-                    SyntaxKind::RegexPredicateNoMatch => {
-                        split_regex_predicate(
-                            Lexeme::new(source, span),
-                            SyntaxKind::OpRegexNoMatch,
-                            &mut tokens,
-                        );
                     }
                     _ => {
                         tokens.push(Token::new(kind, range_to_text_range(span)));
@@ -82,6 +90,7 @@ pub fn lex(source: &str) -> Vec<Token> {
                 }
             }
             Some(Err(())) => {
+                expects_regex = false;
                 if error_start.is_none() {
                     error_start = Some(lexer.span().start);
                 }
@@ -131,28 +140,22 @@ fn split_string_literal(lexeme: Lexeme<'_>, tokens: &mut Vec<Token>) {
     tokens.push(Token::new(quote_kind, range_to_text_range(end - 1..end)));
 }
 
-fn split_regex_predicate(lexeme: Lexeme<'_>, op_kind: SyntaxKind, tokens: &mut Vec<Token>) {
-    let start = lexeme.start();
-    let end = lexeme.end();
+fn regex_literal_len(text: &str) -> usize {
+    let mut escaped = false;
 
-    tokens.push(Token::new(op_kind, range_to_text_range(start..start + 2)));
+    for (offset, ch) in text[1..].char_indices() {
+        if ch == '\n' {
+            return offset + 1;
+        }
 
-    let regex_start_in_text = lexeme.text[2..]
-        .find('/')
-        .expect("regex predicate always contains '/' after the 2-char operator")
-        + 2;
+        if ch == '/' && !escaped {
+            return offset + 2;
+        }
 
-    if regex_start_in_text > 2 {
-        tokens.push(Token::new(
-            SyntaxKind::Whitespace,
-            range_to_text_range(start + 2..start + regex_start_in_text),
-        ));
+        escaped = ch == '\\' && !escaped;
     }
 
-    tokens.push(Token::new(
-        SyntaxKind::RegexLiteral,
-        range_to_text_range(start + regex_start_in_text..end),
-    ));
+    text.len()
 }
 
 #[inline]

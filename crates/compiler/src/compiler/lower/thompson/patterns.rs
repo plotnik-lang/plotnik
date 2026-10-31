@@ -71,6 +71,55 @@ impl NfaBuilder<'_> {
         node: &ast::NamedNodePattern,
         ctx: PatternCtx,
     ) -> Label {
+        if node.is_any()
+            || node.is_missing()
+            || node
+                .kind_token()
+                .is_some_and(|token| token.kind() == SyntaxKind::KwError)
+        {
+            return self.compile_named_node_body(node, ctx);
+        }
+
+        let kinds = self
+            .ctx
+            .analysis
+            .grammar
+            .named_selector(&node.selector_name())
+            .to_vec();
+        if kinds.len() == 1 {
+            return self.compile_named_node_body(node, ctx);
+        }
+
+        let nav = ctx.nav.unwrap_or(Nav::Stay);
+        let body = self.compile_named_node_body(
+            node,
+            PatternCtx {
+                nav: Some(Nav::StayExact),
+                ..ctx
+            },
+        );
+        let guards: Vec<_> = kinds
+            .into_iter()
+            .map(|kind| {
+                let guard = self.fresh_label();
+                self.emit_match(
+                    MatchIR::epsilon(guard, body)
+                        .nav(Nav::StayExact)
+                        .node_kind(NodeKindConstraint::Named(Some(kind))),
+                )
+            })
+            .collect();
+        let dispatch = self.fresh_label();
+        self.emit_match(MatchIR::epsilon(dispatch, guards[0]).successors(guards));
+        let entry = self.fresh_label();
+        self.emit_match(
+            MatchIR::epsilon(entry, dispatch)
+                .nav(nav)
+                .node_kind(NodeKindConstraint::Named(None)),
+        )
+    }
+
+    fn compile_named_node_body(&mut self, node: &ast::NamedNodePattern, ctx: PatternCtx) -> Label {
         let pattern_span = self
             .span_id(node.syntax(), SpanKind::Pattern)
             .map(|id| id.0);
@@ -1256,15 +1305,12 @@ impl NfaBuilder<'_> {
                 }
             };
         }
-        let type_name = type_token.text();
-
-        let sym = self
+        let ids = self
             .ctx
             .analysis
-            .interner
-            .get(type_name)
-            .expect("bound named node kind must be interned");
-        NodeKindConstraint::Named(Some(self.ctx.analysis.grammar.expect_named_kind(sym)))
+            .grammar
+            .named_selector(&node.selector_name());
+        NodeKindConstraint::Named((ids.len() == 1).then(|| ids[0]))
     }
 
     pub(super) fn resolve_field(&mut self, field: &ast::FieldPattern) -> Option<NodeFieldId> {

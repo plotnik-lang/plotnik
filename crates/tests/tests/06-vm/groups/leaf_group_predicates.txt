@@ -1,0 +1,89 @@
+Q = (program
+  (comment ^= "//") @line
+  (comment =~ /block/) @block
+)
+--------------- INPUT (input.txt) ----------------
+// line
+/* block */
+plain control;
+--------------------- OUTPUT ---------------------
+{
+  "block": {
+    "kind": "comment__block",
+    "span": [8, 19],
+    "text": "/* block */"
+  },
+  "line": {
+    "kind": "comment__line",
+    "span": [0, 7],
+    "text": "// line"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "block"
+S2 "//"
+S3 "line"
+S4 "Q"
+S5 "program"
+S6 "comment__line"
+S7 "comment__block"
+
+[regex]
+R1 /block/
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { line, block }
+
+[type_members]
+M0: S3 → T0  ; line: <Node>
+M1: S1 → T0  ; block: <Node>
+
+[type_names]
+N0: S4 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (comment__line)                13
+             (comment__block)               14
+  03   !   (_ =~ /block/)                   05          [Node RecordSet(M1 block)]
+  05  ─‣┘  _                                06
+  06       return
+  07   !   (comment__line)                  03
+  08   !   (comment__block)                 03
+  09   !   switch
+             (comment__line)                07
+             (comment__block)               08
+  10  ─‣─  (_)                              09
+  11   !   (_ ^= "//")                      10          [Node RecordSet(M0 line)]
+  13   !   (comment__line)                  11
+  14   !   (comment__block)                 11
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (comment__line)
+  02   ●   switch (comment__line)           13
+  13   !   (comment__line)                  11
+       ●   (comment__line)
+  11   !   (_ ^= "//")                      10          [Node RecordSet(M0 line)]
+       ●   (comment__line) "// line"
+  10  ─‣─  (_)                              09
+       ●   (comment__block)
+  09   ●   switch (comment__block)          08
+  08   !   (comment__block)                 03
+       ●   (comment__block)
+  03   !   (_ =~ /block/)                   05          [Node RecordSet(M1 block)]
+       ●   (comment__block) "/* block */"
+  05  ─‣┘  _                                06
+       ●   (program)
+  06   ◀   return                           ◼

@@ -1,0 +1,12 @@
+Q = (program (function -label__name))
+--------------- INPUT (input.txt) ----------------
+------------------ DIAGNOSTICS -------------------
+error: `label__name` is not a grammar field of `function__regular`
+ --> query.ptk:1:24
+  |
+1 | Q = (program (function -label__name))
+  |               -------- ^^^^^^^^^^^^
+  |               |
+  |               `function__regular` starts here
+  |
+help: remove `-label__name`

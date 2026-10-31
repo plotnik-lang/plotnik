@@ -1,0 +1,39 @@
+Q = (program (function/regular) @function)
+--------------- INPUT (input.txt) ----------------
+arrow() => wrong_member;
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "function"
+S2 "Q"
+S3 "program"
+S4 "function__regular"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { function }
+
+[type_members]
+M0: S1 → T0  ; function: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (function__regular)               3           [Node RecordSet(M0 function)]
+  3  ─‣┘  _                                 4
+  4       return
+--------------------- TRACE ----------------------
+Q:
+  0   !   (program)                         1
+      ●   (program)
+  1  └‣─  (function__regular)               3           [Node RecordSet(M0 function)]
+      ○   (function__arrow)
+      ○   no candidate

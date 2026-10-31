@@ -57,6 +57,7 @@ pub enum Language {
     JavaScript,
     TypeScript,
     Dart,
+    Groups,
 }
 
 impl Language {
@@ -70,6 +71,7 @@ impl Language {
             Some("js") => Ok(Self::JavaScript),
             Some("ts") => Ok(Self::TypeScript),
             Some("dart") => Ok(Self::Dart),
+            Some("txt") => Ok(Self::Groups),
             _ => Err(format!(
                 "unsupported input filename `{}`",
                 filename.expect("named input")

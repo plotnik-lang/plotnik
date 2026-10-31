@@ -81,9 +81,11 @@ pub(super) fn needs_space(previous: Option<SyntaxKind>, current: SyntaxKind) -> 
     }
     if matches!(
         current,
-        TokenRole::Colon | TokenRole::Refinement | TokenRole::Quantifier
-    ) || matches!(previous, TokenRole::Refinement | TokenRole::PrefixOperator)
-    {
+        TokenRole::Colon | TokenRole::SelectorSeparator | TokenRole::Quantifier
+    ) || matches!(
+        previous,
+        TokenRole::SelectorSeparator | TokenRole::PrefixOperator
+    ) {
         return false;
     }
     if current == TokenRole::StringContent && previous == TokenRole::Quote {
@@ -112,7 +114,7 @@ enum TokenRole {
     Open,
     Close,
     Colon,
-    Refinement,
+    SelectorSeparator,
     PrefixOperator,
     Quantifier,
     Quote,
@@ -132,7 +134,7 @@ impl TokenRole {
                 Self::Close
             }
             SyntaxKind::Colon => Self::Colon,
-            SyntaxKind::Slash | SyntaxKind::Hash => Self::Refinement,
+            SyntaxKind::Slash => Self::SelectorSeparator,
             SyntaxKind::Minus | SyntaxKind::Negation => Self::PrefixOperator,
             kind if is_quantifier(kind) => Self::Quantifier,
             SyntaxKind::DoubleQuote | SyntaxKind::SingleQuote => Self::Quote,

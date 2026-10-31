@@ -1,0 +1,147 @@
+F = (function
+  parameter: (identifier) @parameter
+)
+
+Q = (program
+  (F)+ @functions
+)
+--------------- INPUT (input.txt) ----------------
+arrow(first) => result;
+fn second(last) {}
+--------------------- OUTPUT ---------------------
+{
+  "functions": [
+    {
+      "parameter": {
+        "kind": "identifier",
+        "span": [6, 11],
+        "text": "first"
+      }
+    },
+    {
+      "parameter": {
+        "kind": "identifier",
+        "span": [34, 38],
+        "text": "last"
+      }
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "parameter"
+S2 "functions"
+S3 "F"
+S4 "Q"
+S5 "function__regular"
+S6 "function__arrow"
+S7 "identifier"
+S8 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { parameter }
+T2 = ListOneOrMore(T1)  ; F+
+T3 = Record  M1:1  ; { functions }
+
+[type_members]
+M0: S1 → T0  ; parameter: <Node>
+M1: S2 → T2  ; functions: T2
+
+[type_names]
+N0: S3 → T1  ; F
+N1: S4 → T3  ; Q
+
+[entrypoints]
+F = 00 :: T1
+Q = 02 :: T3
+
+[instructions]
+F:
+  00   !   (_)                              01
+  01   !   switch
+             (function__regular)            10
+             (function__arrow)              11
+
+Q:
+  02   !   (program)                        03
+  03  └─!  _                                19, 21      [ListOpen]
+  05  └‣─  parameter: (identifier)          07          [Node RecordSet(M0 parameter)]
+  07  ─‣┘  _                                08
+  08       return
+  09   !   (_)                              05
+  10   !   (function__regular)              09
+  11   !   (function__arrow)                09
+  12       return
+  13  -ε-                                   21, 24      [ArrayPush]
+  15  ...
+  16  -ε-                                   13          [RecordClose]
+  18   !   (F)                              00 : 16
+  19  -ε-                                   18          [RecordOpen]
+  21  ──!  _                                19, 21
+  23  ...
+  24  ─‣┘  _                                12          [ListClose RecordSet(M1 functions)]
+--------------------- TRACE ----------------------
+Q:
+  02   !   (program)                        03
+       ●   (program)
+  03  └─!  _                                19, 21      [ListOpen]
+       ●   (function__arrow)
+  19  -ε-                                   18          [RecordOpen]
+  18   !   (F)                              00 : 16
+       ●   (function__arrow)
+       ▶   (F)
+
+F:
+  00   !   (_)                              01
+       ●   (function__arrow)
+  01   ●   switch (function__arrow)         11
+  11   !   (function__arrow)                09
+       ●   (function__arrow)
+  09   !   (_)                              05
+       ●   (function__arrow)
+  05  └‣─  parameter: (identifier)          07          [Node RecordSet(M0 parameter)]
+       ○   "arrow"
+       ○   "("
+       ●   parameter: (identifier)
+  07  ─‣┘  _                                08
+       ●   (function__arrow)
+  08   ◀   return                           16
+
+Q:
+  16  -ε-                                   13          [RecordClose]
+  13  -ε-                                   21, 24      [ArrayPush]
+  21  ──!  _                                19, 21
+       ●   (function__regular)
+  19  -ε-                                   18          [RecordOpen]
+  18   !   (F)                              00 : 16
+       ●   (function__regular)
+       ▶   (F)
+
+F:
+  00   !   (_)                              01
+       ●   (function__regular)
+  01   ●   switch (function__regular)       10
+  10   !   (function__regular)              09
+       ●   (function__regular)
+  09   !   (_)                              05
+       ●   (function__regular)
+  05  └‣─  parameter: (identifier)          07          [Node RecordSet(M0 parameter)]
+       ○   "fn"
+       ○   name: (identifier)
+       ○   "("
+       ●   parameter: (identifier)
+  07  ─‣┘  _                                08
+       ●   (function__regular)
+  08   ◀   return                           16
+
+Q:
+  16  -ε-                                   13          [RecordClose]
+  13  -ε-                                   21, 24      [ArrayPush]
+  21  ──!  _                                19, 21
+       ○   no candidate
+  13  ❮❮❮
+  24  ─‣┘  _                                12          [ListClose RecordSet(M1 functions)]
+       ●   (program)
+  12   ◀   return                           ◼

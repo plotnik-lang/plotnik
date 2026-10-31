@@ -1,5 +1,5 @@
 (named_node kind: (identifier) @tag)
-(named_node subtype: (identifier) @tag)
+(group_selector) @tag
 (missing_node kind: (identifier) @tag)
 (field name: (identifier) @property)
 (negated_field name: (identifier) @property)

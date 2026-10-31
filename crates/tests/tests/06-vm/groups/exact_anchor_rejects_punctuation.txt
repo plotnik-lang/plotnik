@@ -1,0 +1,116 @@
+Q = (program
+  (function
+    body: (block
+      (identifier) @first
+      .!
+      (identifier) @last
+    )
+  )
+)
+--------------- INPUT (input.txt) ----------------
+fn chosen() { input, output }
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "first"
+S2 "last"
+S3 "Q"
+S4 "program"
+S5 "function__regular"
+S6 "function__arrow"
+S7 "block"
+S8 "identifier"
+S9 "body"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { first, last }
+
+[type_members]
+M0: S1 → T0  ; first: <Node>
+M1: S2 → T0  ; last: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (function__regular)            07
+             (function__arrow)              16
+  03  ──!  (identifier)                     05          [Node RecordSet(M1 last)]
+  05  ─‣┘³ _                                06
+  06       return
+  07   !   (function__regular)              15
+  08   !   (identifier)                     03          [Node RecordSet(M0 first)]
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14  └‣─  body: (block)                    12
+  15   !   (_)                              14
+  16   !   (function__arrow)                15
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (function__regular)
+  02   ●   switch (function__regular)       07
+  07   !   (function__regular)              15
+       ●   (function__regular)
+  15   !   (_)                              14
+       ●   (function__regular)
+  14  └‣─  body: (block)                    12
+       ○   "fn"
+       ○   name: (identifier)
+       ○   "("
+       ○   ")"
+       ●   body: (block)
+  12  └─!  _                                08, 10
+       ●   "{"
+  08   !   (identifier)                     03          [Node RecordSet(M0 first)]
+       ○   "{"
+       ○   no candidate
+  12  ❮❮❮
+  10  ──!  _                                08, 10
+       ●   (identifier)
+  08   !   (identifier)                     03          [Node RecordSet(M0 first)]
+       ●   (identifier)
+  03  ──!  (identifier)                     05          [Node RecordSet(M1 last)]
+       ○   ","
+       ○   no candidate
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+       ●   ","
+  08   !   (identifier)                     03          [Node RecordSet(M0 first)]
+       ○   ","
+       ○   no candidate
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+       ●   (identifier)
+  08   !   (identifier)                     03          [Node RecordSet(M0 first)]
+       ●   (identifier)
+  03  ──!  (identifier)                     05          [Node RecordSet(M1 last)]
+       ○   "}"
+       ○   no candidate
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+       ●   "}"
+  08   !   (identifier)                     03          [Node RecordSet(M0 first)]
+       ○   "}"
+       ○   no candidate
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+       ○   no candidate
+  14  ❮❮❮
+  14  └‣─  body: (block)                    12
+       ○   no candidate
+  01  ❮❮❮
+  01  └‣─  (_)                              02
+       ○   no candidate

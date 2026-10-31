@@ -1,0 +1,98 @@
+Q = (program
+  (value) @leaf
+  (value
+    (identifier) @inner
+  ) @group
+)
+--------------- INPUT (input.txt) ----------------
+unit group(content)
+--------------------- OUTPUT ---------------------
+{
+  "group": {
+    "kind": "value__group",
+    "span": [5, 19],
+    "text": "group(content)"
+  },
+  "inner": {
+    "kind": "identifier",
+    "span": [11, 18],
+    "text": "content"
+  },
+  "leaf": {
+    "kind": "value__leaf",
+    "span": [0, 4],
+    "text": "unit"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "leaf"
+S2 "group"
+S3 "inner"
+S4 "Q"
+S5 "program"
+S6 "value__leaf"
+S7 "value__group"
+S8 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:3  ; { leaf, group, inner }
+
+[type_members]
+M0: S1 → T0  ; leaf: <Node>
+M1: S2 → T0  ; group: <Node>
+M2: S3 → T0  ; inner: <Node>
+
+[type_names]
+N0: S4 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (value__leaf)                  07
+             (value__group)                 16
+  03  └‣─  (identifier)                     05          [Node RecordSet(M2 inner)]
+  05  ─‣┘² _                                06
+  06       return
+  07   !   (value__leaf)                    14
+  08   !   (_)                              03          [Node RecordSet(M1 group)]
+  10   !   (value__leaf)                    08
+  11   !   (value__group)                   08
+  12   !   switch
+             (value__leaf)                  10
+             (value__group)                 11
+  13  ─‣─  (_)                              12
+  14   !   (_)                              13          [Node RecordSet(M0 leaf)]
+  16   !   (value__group)                   14
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (value__leaf)
+  02   ●   switch (value__leaf)             07
+  07   !   (value__leaf)                    14
+       ●   (value__leaf)
+  14   !   (_)                              13          [Node RecordSet(M0 leaf)]
+       ●   (value__leaf)
+  13  ─‣─  (_)                              12
+       ●   (value__group)
+  12   ●   switch (value__group)            11
+  11   !   (value__group)                   08
+       ●   (value__group)
+  08   !   (_)                              03          [Node RecordSet(M1 group)]
+       ●   (value__group)
+  03  └‣─  (identifier)                     05          [Node RecordSet(M2 inner)]
+       ○   "group"
+       ○   "("
+       ●   (identifier)
+  05  ─‣┘² _                                06
+       ●   (program)
+  06   ◀   return                           ◼

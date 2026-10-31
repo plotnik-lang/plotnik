@@ -1,0 +1,7 @@
+#eq? @x "old syntax is comment text"
+(literal#number) discarded to end of line
+)
+--------------------- TOKENS ---------------------
+ParenOpen "("
+Id "literal"
+ParenClose ")"

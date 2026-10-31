@@ -1,0 +1,7 @@
+Q = (literal/number/extra)
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:1:20
+  |
+1 | Q = (literal/number/extra)
+  |                    ^

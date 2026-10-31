@@ -2,56 +2,52 @@
 
 Tree-sitter grammar for the Plotnik query language (`.ptk` files).
 
-Standalone for now: not wired into the Rust workspace, the CLI, or any
-editor distribution. CI generates the parser from `grammar.js` and runs the
-corpus, so the grammar stays correct even though `src/` is not committed.
-
 ## Development
 
+Use the same CLI version pinned in `.github/workflows/grammar.yml`:
+
 ```sh
+cargo install tree-sitter-cli --version 0.26.10 --locked
 tree-sitter generate   # grammar.js -> src/
 tree-sitter test       # corpus + highlight assertions
 tree-sitter parse q.ptk
 ```
 
+CI generates the parser from `grammar.js` and runs the corpus. Generated files in `src/` are not committed.
+
 ## Acceptance contract
 
-The source of truth is the reference parser in
-`crates/compiler/src/compiler/parse/`. This grammar mirrors it at the
-**syntax level**: anything the reference parser accepts without error-level
-diagnostics parses cleanly here, with the deliberate exceptions below.
-Later-stage rejections (analyze/link: unknown node kinds, empty `()`/`[]`/
-`{}`, supertype refinements, dimensionality, anchor placement semantics)
-are out of scope, as usual for editor grammars — files may parse here and
-still fail `plotnik check` when compiled against a source grammar selected with `--lang`.
+Follow the Rust parser in `crates/compiler/src/compiler/parse/` when changing this grammar. Queries it parses without errors should parse here too, with the exceptions below.
 
-Deliberately rejected despite being warn-accepted (deprecated) upstream:
+The compiler checks names and child patterns against the selected source grammar. It also checks the results built by captures and where anchors can be used.
 
-- `((a) (b))` tree-sitter parenthesized sequences — use `{(a) (b)}`
-- `!field` negation — use `-field`
+The Rust parser accepts these forms with a deprecation warning. This grammar rejects them:
 
-Deliberately rejected despite parsing upstream (they can never compile):
+- `((a) (b))`: use `{(a) (b)}` for sibling sequences.
+- `!field`: use `-field` for negated fields.
 
-- predicate operator/value mismatches: `(a == /re/)`, `(a =~ "str")`
-- anchors/negated fields as definition bodies (upstream parses them and
-  rejects the definition at analysis with `NoEntrypoints`)
+These forms parse in Rust but fail compiler checks. This grammar rejects them during parsing:
 
-The reference parser rejects all other misplaced positional assertions
-itself — suffixes on anchors/negated fields, anchors/negated fields as
-field values or branches, negated fields in sequences — as well as any
-children in `(ERROR)` and `(MISSING)`, and this grammar matches those
-rejections.
+- Predicates with the wrong value form: `(a == /re/)`, `(a =~ "str")`.
+- Definitions whose entire body is an anchor or negated field. The compiler reports `NoEntrypoints` for these.
+
+Both parsers reject:
+
+- Suffixes on anchors or negated fields.
+- Anchors or negated fields used as field values or alternatives.
+- Negated fields in sibling sequences.
+- Children inside `(ERROR)` or `(MISSING)`.
 
 First-line language declarations such as `// @javascript` are ordinary comments in this grammar. The compiler reads and validates their language names during source analysis.
 
-Known micro-divergences on inputs that never compile anyway:
+`#`, `//`, and `;` start line comments. `/* ... */` is a block comment. Inside strings and regex literals, comment markers belong to the literal.
 
-- `=~ //` lexes as an empty predicate followed by a comment (reference:
-  empty regex, then "empty regex pattern" at analyze)
+`(group/member)` parses as a `named_node` with a `group_selector` token in its `kind` field. Both names use lowercase snake_case, separated by one `/` with no spaces. `(kind)` has an `identifier` in the same field.
+
+The compiler resolves `(kind)` to a concrete kind or a kind group in the selected source grammar. See [Kind groups](../docs/reference.md#kind-groups) for matching rules.
 
 ## Layout
 
-- `grammar.js` — the grammar; `src/` is generated and gitignored
-- `test/corpus/` — parse expectations, including an `invalid.txt` suite
-  asserting the rejections above
-- `test/highlight/` + `queries/highlights.scm` — highlighting smoke tests
+- `grammar.js`: parser rules.
+- `test/corpus/`: parse expectations, including the rejections in `invalid.txt`.
+- `test/highlight/` and `queries/highlights.scm`: highlighting tests.

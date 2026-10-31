@@ -1,0 +1,119 @@
+Q = (program
+  (function
+    (identifier) @first
+    (identifier == "keep") @last
+  ) @chosen
+)
+--------------- INPUT (input.txt) ----------------
+arrow(leaked) => reject;
+fn chosen(keep) {}
+--------------------- OUTPUT ---------------------
+{
+  "chosen": {
+    "kind": "function__regular",
+    "span": [25, 43],
+    "text": "fn chosen(keep) {}"
+  },
+  "first": {
+    "kind": "identifier",
+    "span": [28, 34],
+    "text": "chosen"
+  },
+  "last": {
+    "kind": "identifier",
+    "span": [35, 39],
+    "text": "keep"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "keep"
+S2 "chosen"
+S3 "first"
+S4 "last"
+S5 "Q"
+S6 "program"
+S7 "function__regular"
+S8 "function__arrow"
+S9 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:3  ; { chosen, first, last }
+
+[type_members]
+M0: S2 → T0  ; chosen: <Node>
+M1: S3 → T0  ; first: <Node>
+M2: S4 → T0  ; last: <Node>
+
+[type_names]
+N0: S5 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (function__regular)            07
+             (function__arrow)              12
+  03  ─‣─  (identifier == "keep")           05          [Node RecordSet(M2 last)]
+  05  ─‣┘² _                                06
+  06       return
+  07   !   (function__regular)              10
+  08  └‣─  (identifier)                     03          [Node RecordSet(M1 first)]
+  10   !   (_)                              08          [Node RecordSet(M0 chosen)]
+  12   !   (function__arrow)                10
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (function__arrow)
+  02   ●   switch (function__arrow)         12
+  12   !   (function__arrow)                10
+       ●   (function__arrow)
+  10   !   (_)                              08          [Node RecordSet(M0 chosen)]
+       ●   (function__arrow)
+  08  └‣─  (identifier)                     03          [Node RecordSet(M1 first)]
+       ○   "arrow"
+       ○   "("
+       ●   (identifier)
+  03  ─‣─  (identifier == "keep")           05          [Node RecordSet(M2 last)]
+       ○   ")"
+       ○   "=>"
+       ○   (identifier) "reject"
+       ○   ";"
+       ○   no candidate
+  08  ❮❮❮
+  08  └‣─  (identifier)                     03          [Node RecordSet(M1 first)]
+       ○   ")"
+       ○   "=>"
+       ●   (identifier)
+  03  ─‣─  (identifier == "keep")           05          [Node RecordSet(M2 last)]
+       ○   ";"
+       ○   no candidate
+  08  ❮❮❮
+  08  └‣─  (identifier)                     03          [Node RecordSet(M1 first)]
+       ○   ";"
+       ○   no candidate
+  01  ❮❮❮
+  01  └‣─  (_)                              02
+       ●   (function__regular)
+  02   ●   switch (function__regular)       07
+  07   !   (function__regular)              10
+       ●   (function__regular)
+  10   !   (_)                              08          [Node RecordSet(M0 chosen)]
+       ●   (function__regular)
+  08  └‣─  (identifier)                     03          [Node RecordSet(M1 first)]
+       ○   "fn"
+       ●   (identifier)
+  03  ─‣─  (identifier == "keep")           05          [Node RecordSet(M2 last)]
+       ○   "("
+       ●   (identifier) "keep"
+  05  ─‣┘² _                                06
+       ●   (program)
+  06   ◀   return                           ◼

@@ -1,0 +1,70 @@
+Q = (program
+  [
+    (function/regular) @regular
+    (function) @broad
+  ]
+)
+--------------- INPUT (input.txt) ----------------
+fn preferred() {}
+arrow() => later;
+--------------------- OUTPUT ---------------------
+{
+  "broad": null,
+  "regular": {
+    "kind": "function__regular",
+    "span": [0, 17],
+    "text": "fn preferred() {}"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "regular"
+S2 "broad"
+S3 "Q"
+S4 "program"
+S5 "function__regular"
+S6 "function__arrow"
+
+[type_defs]
+T0 = <Node>
+T1 = Option(T0)  ; <Node>?
+T2 = Record  M0:2  ; { regular, broad }
+
+[type_members]
+M0: S1 → T1  ; regular: T1
+M1: S2 → T1  ; broad: T1
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └─!  _                                04, 14, 16
+  03       return
+  04   !   (function__regular)              07          [Absent RecordSet(M1 broad) Node RecordSet(M0 regular)]
+  07  ─‣┘  _                                03
+  08   !   (_)                              07          [Absent RecordSet(M0 regular) Node RecordSet(M1 broad)]
+  11   !   (function__regular)              08
+  12   !   (function__arrow)                08
+  13   !   switch
+             (function__regular)            11
+             (function__arrow)              12
+  14   !   (_)                              13
+  15  ...
+  16  ──!  _                                04, 14, 16
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └─!  _                                04, 14, 16
+       ●   (function__regular)
+  04   !   (function__regular)              07          [Absent RecordSet(M1 broad) Node RecordSet(M0 regular)]
+       ●   (function__regular)
+  07  ─‣┘  _                                03
+       ●   (program)
+  03   ◀   return                           ◼

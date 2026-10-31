@@ -24,3 +24,9 @@ Flag = (comment)? @present :: bool
 Missing = (statement_block (MISSING ";"))
 ;                           ^ @keyword
 ;                                   ^ @string
+
+Exact = (literal/number)
+;         ^ @tag
+
+# hash comment
+; <- @comment

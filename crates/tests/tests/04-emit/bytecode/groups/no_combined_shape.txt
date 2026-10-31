@@ -1,0 +1,28 @@
+Q = (program
+  (function
+    name: (identifier)
+    value: (identifier)
+  )
+)
+--------------- INPUT (input.txt) ----------------
+------------------ DIAGNOSTICS -------------------
+error: `name` is not a grammar field of `function__arrow`
+ --> query.ptk:3:5
+  |
+2 |   (function
+  |    -------- `function__arrow` starts here
+3 |     name: (identifier)
+  |     ^^^^
+  |
+help: valid grammar fields for `function__arrow`: `parameter`, `value`
+
+error: `value` is not a grammar field of `function__regular`
+ --> query.ptk:4:5
+  |
+2 |   (function
+  |    -------- `function__regular` starts here
+3 |     name: (identifier)
+4 |     value: (identifier)
+  |     ^^^^^
+  |
+help: valid grammar fields for `function__regular`: `body`, `name`, `parameter`

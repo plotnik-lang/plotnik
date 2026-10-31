@@ -1,0 +1,19 @@
+Q = (literal/ /* comment */ number)
+------------------ DIAGNOSTICS -------------------
+error: expected an adjacent lowercase snake_case member after `/`
+ --> query.ptk:1:13
+  |
+1 | Q = (literal/ /* comment */ number)
+  |             ^
+
+error: node kinds must be parenthesized
+ --> query.ptk:1:29
+  |
+1 | Q = (literal/ /* comment */ number)
+  |                             ^^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (literal/ /* comment */ number)
+1 + Q = (literal/ /* comment */ (number))
+  |

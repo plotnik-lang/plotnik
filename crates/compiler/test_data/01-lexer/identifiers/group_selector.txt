@@ -1,0 +1,13 @@
+(literal/number) (literal) (literal__number)
+--------------------- TOKENS ---------------------
+ParenOpen "("
+Id "literal"
+Slash "/"
+Id "number"
+ParenClose ")"
+ParenOpen "("
+Id "literal"
+ParenClose ")"
+ParenOpen "("
+Id "literal__number"
+ParenClose ")"

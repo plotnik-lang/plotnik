@@ -1,0 +1,7 @@
+Q = (literal-kind/number)
+------------------ DIAGNOSTICS -------------------
+error: group names must be lowercase snake_case
+ --> query.ptk:1:18
+  |
+1 | Q = (literal-kind/number)
+  |                  ^

@@ -1,0 +1,76 @@
+Q = (program
+  (function/arrow) @arrow
+  (function/regular) @regular
+  (function/arrow) @last_arrow
+)
+--------------- INPUT (input.txt) ----------------
+fn skipped() {}
+arrow() => first;
+fn kept() {}
+arrow() => last;
+--------------------- OUTPUT ---------------------
+{
+  "arrow": {
+    "kind": "function__arrow",
+    "span": [16, 33],
+    "text": "arrow() => first;"
+  },
+  "last_arrow": {
+    "kind": "function__arrow",
+    "span": [47, 63],
+    "text": "arrow() => last;"
+  },
+  "regular": {
+    "kind": "function__regular",
+    "span": [34, 46],
+    "text": "fn kept() {}"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "arrow"
+S2 "regular"
+S3 "last_arrow"
+S4 "Q"
+S5 "program"
+S6 "function__arrow"
+S7 "function__regular"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:3  ; { arrow, regular, last_arrow }
+
+[type_members]
+M0: S1 → T0  ; arrow: <Node>
+M1: S2 → T0  ; regular: <Node>
+M2: S3 → T0  ; last_arrow: <Node>
+
+[type_names]
+N0: S4 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (function__arrow)                 3           [Node RecordSet(M0 arrow)]
+  3  ─‣─  (function__regular)               5           [Node RecordSet(M1 regular)]
+  5  ─‣─  (function__arrow)                 7           [Node RecordSet(M2 last_arrow)]
+  7  ─‣┘  _                                 8
+  8       return
+--------------------- TRACE ----------------------
+Q:
+  0   !   (program)                         1
+      ●   (program)
+  1  └‣─  (function__arrow)                 3           [Node RecordSet(M0 arrow)]
+      ○   (function__regular)
+      ●   (function__arrow)
+  3  ─‣─  (function__regular)               5           [Node RecordSet(M1 regular)]
+      ●   (function__regular)
+  5  ─‣─  (function__arrow)                 7           [Node RecordSet(M2 last_arrow)]
+      ●   (function__arrow)
+  7  ─‣┘  _                                 8
+      ●   (program)
+  8   ◀   return                            ◼

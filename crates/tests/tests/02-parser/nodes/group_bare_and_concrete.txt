@@ -1,0 +1,26 @@
+Group = (literal)
+Concrete = (literal__number)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Group"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "literal"
+      ParenClose ")"
+  Def
+    Id "Concrete"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "literal__number"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Group
+    NamedNode literal
+  Def Concrete
+    NamedNode literal__number

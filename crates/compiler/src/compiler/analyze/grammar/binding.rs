@@ -6,11 +6,18 @@ use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 #[derive(Clone, Debug, Default)]
 pub struct GrammarBinding {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
+    named_selectors: IndexMap<String, Vec<NodeKindId>>,
     node_field_ids: IndexMap<Symbol, NodeFieldId>,
     identity: Option<GrammarIdentity>,
 }
 
 impl GrammarBinding {
+    pub(crate) fn named_selector(&self, name: &str) -> &[NodeKindId] {
+        self.named_selectors
+            .get(name)
+            .expect("validated selector is bound")
+    }
+
     pub fn resolve_named_kind(&self, sym: Symbol) -> Option<NodeKindId> {
         self.node_kind_ids.get(&NodeKind::Named(sym)).copied()
     }
@@ -73,6 +80,7 @@ impl GrammarBinding {
 #[derive(Default)]
 pub struct GrammarBindingBuilder {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
+    named_selectors: IndexMap<String, Vec<NodeKindId>>,
     node_field_ids: IndexMap<Symbol, NodeFieldId>,
     identity: Option<GrammarIdentity>,
 }
@@ -90,6 +98,10 @@ impl GrammarBindingBuilder {
         self.node_kind_ids.entry(key).or_insert(id);
     }
 
+    pub(crate) fn insert_named_selector(&mut self, name: String, ids: Vec<NodeKindId>) {
+        self.named_selectors.insert(name, ids);
+    }
+
     pub(crate) fn insert_node_field_id(&mut self, sym: Symbol, id: NodeFieldId) {
         self.node_field_ids.entry(sym).or_insert(id);
     }
@@ -97,6 +109,7 @@ impl GrammarBindingBuilder {
     pub fn finish(self) -> GrammarBinding {
         GrammarBinding {
             node_kind_ids: self.node_kind_ids,
+            named_selectors: self.named_selectors,
             node_field_ids: self.node_field_ids,
             identity: self.identity,
         }

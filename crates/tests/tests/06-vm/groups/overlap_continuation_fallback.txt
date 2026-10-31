@@ -1,0 +1,108 @@
+Q = (program
+  [
+    {
+      [
+        (function/regular) @leaked :: text
+        (plain) @plain :: text
+      ]
+      .
+      (plain)
+    }
+    (function) @matched :: text
+  ]
+  .
+  (plain (identifier == "chosen"))
+)
+--------------- INPUT (input.txt) ----------------
+fn candidate() {} plain chosen;
+--------------------- OUTPUT ---------------------
+{
+  "leaked": null,
+  "matched": "fn candidate() {}",
+  "plain": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "chosen"
+S2 "leaked"
+S3 "plain"
+S4 "matched"
+S5 "Q"
+S6 "program"
+S7 "function__regular"
+S8 "function__arrow"
+S9 "identifier"
+
+[type_defs]
+T0 = <Text>
+T1 = Option(T0)  ; <Text>?
+T2 = Record  M0:3  ; { leaked, plain, matched }
+
+[type_members]
+M0: S2 → T1  ; leaked: T1
+M1: S3 → T1  ; plain: T1
+M2: S4 → T1  ; matched: T1
+
+[type_names]
+N0: S5 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └─!  _                                18, 25, 28
+  03  └‣─  (identifier == "chosen")         05
+  05  ─‣┘² _                                06
+  06       return
+  07  ─•─  (plain)                          03
+  08  ─•─  (plain)                          07
+  09   !   (function__regular)              08          [Absent RecordSet(M1 plain) NodeText RecordSet(M0 leaked)]
+  12  -ε-                                   09
+  13   !   (plain)                          08          [Absent RecordSet(M0 leaked) NodeText RecordSet(M1 plain)]
+  16  -ε-                                   13
+  17   !   switch
+             (function__regular)            12
+             (plain)                        16
+  18  -ε-                                   17          [Absent RecordSet(M2 matched)]
+  20   !   (_)                              07          [NodeText RecordSet(M2 matched)]
+  22   !   (function__regular)              20
+  23   !   (function__arrow)                20
+  24   !   switch
+             (function__regular)            22
+             (function__arrow)              23
+  25   !   (_)                              24          [Absent RecordSet(M0 leaked) Absent RecordSet(M1 plain)]
+  28  ──!  _                                18, 25, 28
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └─!  _                                18, 25, 28
+       ●   (function__regular)
+  18  -ε-                                   17          [Absent RecordSet(M2 matched)]
+  17   ●   switch (function__regular)       12
+  12  -ε-                                   09
+  09   !   (function__regular)              08          [Absent RecordSet(M1 plain) NodeText RecordSet(M0 leaked)]
+       ●   (function__regular)
+  08  ─•─  (plain)                          07
+       ●   (plain)
+  07  ─•─  (plain)                          03
+       ○   no candidate
+  01  ❮❮❮
+  25   !   (_)                              24          [Absent RecordSet(M0 leaked) Absent RecordSet(M1 plain)]
+       ●   (function__regular)
+  24   ●   switch (function__regular)       22
+  22   !   (function__regular)              20
+       ●   (function__regular)
+  20   !   (_)                              07          [NodeText RecordSet(M2 matched)]
+       ●   (function__regular)
+  07  ─•─  (plain)                          03
+       ●   (plain)
+  03  └‣─  (identifier == "chosen")         05
+       ○   "plain"
+       ●   (identifier) "chosen"
+  05  ─‣┘² _                                06
+       ●   (program)
+  06   ◀   return                           ◼

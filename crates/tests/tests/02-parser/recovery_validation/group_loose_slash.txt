@@ -1,0 +1,7 @@
+Q = (literal /number)
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:1:14
+  |
+1 | Q = (literal /number)
+  |              ^

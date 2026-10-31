@@ -10,6 +10,10 @@ use super::raw::RawGrammar;
 use super::render::TreeGrammar;
 use super::structure::{NodeRealizer, StructureTable};
 
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod types_tests;
+
 pub(super) struct GrammarTables {
     pub(super) node_shapes: Vec<NodeShape>,
     pub(super) symbols: Vec<NodeKindEntry>,
@@ -52,6 +56,7 @@ pub struct Grammar {
     extra_node_kinds: Vec<NodeKindId>,
     root_node_kind: Option<NodeKindId>,
     named_node_ids: HashMap<String, NodeKindId>,
+    groups: HashMap<String, Vec<NodeKindId>>,
     anonymous_node_ids: HashMap<String, NodeKindId>,
     node_names: HashMap<NodeKindId, String>,
     field_ids: HashMap<String, NodeFieldId>,
@@ -70,6 +75,7 @@ pub struct Grammar {
 impl Grammar {
     /// Build production grammar metadata from a raw source-format grammar.
     pub fn from_raw(raw: &RawGrammar) -> Result<Self, GrammarError> {
+        validate_group_aliases(raw).map_err(GrammarError::Analysis)?;
         use super::{
             aliases::extract_default_aliases,
             lower::{LoweredGrammar, derive_fields, derive_symbols},
@@ -158,6 +164,16 @@ impl Grammar {
             }
 
             if symbol.named {
+                if symbol.kind_name.contains("__")
+                    && let Some(&existing) = named_node_ids.get(&symbol.kind_name)
+                    && existing != node_id
+                {
+                    return Err(format!(
+                        "group member `{}` has multiple concrete kind IDs",
+                        symbol.kind_name
+                    ));
+                }
+
                 named_node_ids.entry(symbol.kind_name).or_insert(node_id);
             } else {
                 anonymous_node_ids
@@ -199,6 +215,35 @@ impl Grammar {
         let mut all_named_node_kinds = named_node_ids.keys().cloned().collect::<Vec<_>>();
         all_named_node_kinds.sort();
 
+        let mut groups: HashMap<String, Vec<NodeKindId>> = HashMap::new();
+        let mut member_ids = HashSet::new();
+        for name in &all_named_node_kinds {
+            let Some((group, member)) = name.split_once("__") else {
+                continue;
+            };
+            let id = named_node_ids[name];
+            if !is_group_name(group) || !is_group_name(member) {
+                return Err(format!(
+                    "group member `{name}` must have the form group__member with snake_case segments"
+                ));
+            }
+
+            if named_node_ids.contains_key(group) {
+                return Err(format!("group `{group}` collides with a named node kind"));
+            }
+
+            if supertype_ids.contains(&id) || !member_ids.insert(id) {
+                return Err(format!(
+                    "group member `{name}` must have a unique concrete kind ID"
+                ));
+            }
+
+            groups.entry(group.to_owned()).or_default().push(id);
+        }
+        for members in groups.values_mut() {
+            members.sort_unstable();
+        }
+
         let mut all_anonymous_node_kinds = anonymous_node_ids.keys().cloned().collect::<Vec<_>>();
         all_anonymous_node_kinds.sort();
 
@@ -215,6 +260,7 @@ impl Grammar {
             extra_node_kinds,
             root_node_kind,
             named_node_ids,
+            groups,
             anonymous_node_ids,
             node_names,
             field_ids,
@@ -264,6 +310,25 @@ impl Grammar {
 
     pub fn resolve_named_node(&self, kind: &str) -> Option<NodeKindId> {
         self.named_node_ids.get(kind).copied()
+    }
+
+    /// Resolve a Plotnik selector to its concrete public named kinds.
+    pub fn resolve_named_selector(&self, selector: &str) -> Option<Vec<NodeKindId>> {
+        if selector.contains("__") {
+            return None;
+        }
+
+        if let Some((group, member)) = selector.split_once('/') {
+            let members = self.groups.get(group)?;
+            let id = self.resolve_named_node(&format!("{group}__{member}"))?;
+            return members.contains(&id).then_some(vec![id]);
+        }
+
+        if let Some(members) = self.groups.get(selector) {
+            return Some(members.clone());
+        }
+
+        self.resolve_named_node(selector).map(|id| vec![id])
     }
 
     pub fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeKindId> {
@@ -769,4 +834,61 @@ where
     }
 
     Ok(resolved)
+}
+
+pub(crate) fn is_group_name(name: &str) -> bool {
+    name.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+        && name.split('_').all(|part| {
+            !part.is_empty()
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        })
+}
+
+fn validate_group_aliases(raw: &RawGrammar) -> Result<(), String> {
+    use super::raw::RawRule;
+
+    let mut pending: Vec<_> = raw
+        .rules
+        .values()
+        .chain(&raw.externals)
+        .chain(&raw.extras)
+        .map(|rule| (rule, false))
+        .collect();
+    while let Some((rule, aliased)) = pending.pop() {
+        match rule {
+            RawRule::ALIAS {
+                content,
+                value,
+                named,
+            } => {
+                if *named && value.contains("__") {
+                    return Err(format!("alias target `{value}` cannot be a group member"));
+                }
+
+                pending.push((content, true));
+            }
+            RawRule::SYMBOL { name } if aliased && name.contains("__") => {
+                return Err(format!("group member `{name}` cannot be aliased"));
+            }
+            RawRule::SEQ { members } | RawRule::CHOICE { members } => {
+                pending.extend(members.iter().map(|rule| (rule, aliased)));
+            }
+            RawRule::REPEAT { content }
+            | RawRule::REPEAT1 { content }
+            | RawRule::FIELD { content, .. }
+            | RawRule::TOKEN { content }
+            | RawRule::IMMEDIATE_TOKEN { content }
+            | RawRule::PREC { content, .. }
+            | RawRule::PREC_LEFT { content, .. }
+            | RawRule::PREC_RIGHT { content, .. }
+            | RawRule::PREC_DYNAMIC { content, .. }
+            | RawRule::RESERVED { content, .. } => {
+                pending.push((content, aliased));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }

@@ -1,0 +1,46 @@
+Q = (program [(literal/number) (literal/string)]* @values)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "program"
+      CapturedPattern
+        Quantifier
+          Alternation
+            BracketOpen "["
+            Alternative
+              NamedNode
+                ParenOpen "("
+                Id "literal"
+                Slash "/"
+                Id "number"
+                ParenClose ")"
+            Alternative
+              NamedNode
+                ParenOpen "("
+                Id "literal"
+                Slash "/"
+                Id "string"
+                ParenClose ")"
+            BracketClose "]"
+          Star "*"
+        Capture
+          CaptureToken "@values"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode program
+      CapturedPattern
+        QuantifiedPattern *
+          Alternation
+            Alternative
+              NamedNode literal
+            Alternative
+              NamedNode literal
+        Capture @values

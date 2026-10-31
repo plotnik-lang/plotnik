@@ -133,15 +133,12 @@ impl GrammarBinder<'_, '_> {
             return true;
         }
 
-        let Some(id) = self.resolve_named_node_id(located) else {
+        let Some(ids) = self.resolve_named_node_ids(located) else {
             return true;
         };
 
-        if self.grammar.is_supertype(id) {
-            return true;
-        }
-
-        id == grammar_root
+        ids.iter()
+            .any(|&id| self.grammar.is_supertype(id) || id == grammar_root)
     }
 
     fn reject_supertype_match(&mut self, located: &Located<NamedNodePattern>) -> bool {
@@ -162,11 +159,7 @@ impl GrammarBinder<'_, '_> {
             .to_string();
         let span = located.span_of(kind_token.text_range());
 
-        let kind = if node.has_supertype_marker() {
-            DiagnosticKind::UnsupportedSupertype
-        } else {
-            DiagnosticKind::BareSupertype
-        };
+        let kind = DiagnosticKind::BareSupertype;
         let mut subtypes = self
             .grammar
             .collect_subtypes(id)

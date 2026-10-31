@@ -53,16 +53,7 @@ impl Builder {
                 {
                     Some(Element::Comment(self.comment(&token)))
                 }
-                NodeOrToken::Token(token) => {
-                    let replacement = if token.kind() == SyntaxKind::Slash
-                        && syntax.kind() != SyntaxKind::Regex
-                    {
-                        Some("#")
-                    } else {
-                        None
-                    };
-                    Some(Element::Token(Token::new(token, replacement)))
-                }
+                NodeOrToken::Token(token) => Some(Element::Token(Token::new(token, None))),
             })
             .collect();
         let kind = NodeKind::from_syntax(syntax.kind(), &elements);

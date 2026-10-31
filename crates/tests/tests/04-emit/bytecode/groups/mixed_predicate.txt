@@ -1,0 +1,12 @@
+Q = (program (value == "unit"))
+--------------- INPUT (input.txt) ----------------
+------------------ DIAGNOSTICS -------------------
+error: predicate `value__group == "unit"` cannot test `value__group` because this node kind can contain children
+ --> query.ptk:1:21
+  |
+1 | Q = (program (value == "unit"))
+  |               ----- ^^^^^^^^^
+  |               |
+  |               `value__group` starts here
+  |
+help: match the children of `value__group` instead of testing the whole node's text

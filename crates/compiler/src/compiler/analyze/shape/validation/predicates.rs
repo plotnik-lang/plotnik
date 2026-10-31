@@ -70,16 +70,6 @@ impl Visitor for PredicateValidator<'_, '_> {
 
 impl PredicateValidator<'_, '_> {
     fn validate_regex(&mut self, regex: RegexLiteral<'_>) {
-        if regex.pattern.is_empty() {
-            self.diag
-                .report(
-                    DiagnosticKind::EmptyRegex,
-                    Span::new(self.source_id, regex.range),
-                )
-                .emit();
-            return;
-        }
-
         let parser_result = ast::parse::ParserBuilder::new()
             .octal(false)
             .build()

@@ -1,7 +1,0 @@
-(expression#member-expression)
---------------------- TOKENS ---------------------
-ParenOpen "("
-Id "expression"
-Hash "#"
-Id "member-expression"
-ParenClose ")"

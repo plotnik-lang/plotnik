@@ -1,9 +1,0 @@
-Q = (RefName#subtype)
------------------- DIAGNOSTICS -------------------
-error: references cannot have supertypes
- --> query.ptk:1:13
-  |
-1 | Q = (RefName#subtype)
-  |             ^
-  |
-help: category refinement applies to node kinds, not definition references. Remove the refinement or apply it to a concrete node kind

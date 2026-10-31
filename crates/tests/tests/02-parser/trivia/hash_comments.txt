@@ -1,0 +1,43 @@
+# leading comment, not #eq? syntax
+Q=(literal#number) ignored until newline
+  # inside node
+  (identifier)@name # trailing child
+) # trailing definition
+---------------------- CST -----------------------
+# query.ptk
+Root
+  LineComment "# leading comment, not #eq? syntax"
+  Newline "\n"
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "literal"
+      LineComment "#number) ignored until newline"
+      Newline "\n"
+      Whitespace "  "
+      LineComment "# inside node"
+      Newline "\n"
+      Whitespace "  "
+      CapturedPattern
+        NamedNode
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+        Capture
+          CaptureToken "@name"
+      Whitespace " "
+      LineComment "# trailing child"
+      Newline "\n"
+      ParenClose ")"
+  Whitespace " "
+  LineComment "# trailing definition"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode literal
+      CapturedPattern
+        NamedNode identifier
+        Capture @name

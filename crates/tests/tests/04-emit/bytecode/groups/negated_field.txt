@@ -1,0 +1,55 @@
+Q = (program
+  (function -name) @function
+)
+--------------- INPUT (input.txt) ----------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 2
+
+[transitions]
+Q:
+  1       return
+  2   !   (program)                         8
+  3  ─‣┘  _                                 1
+  4   !   (_ -name)                         3           [Node RecordSet(function)]
+  5   !   (function__regular)               4
+  6   !   (function__arrow)                 4
+  7   !   switch
+            (function__regular)             5
+            (function__arrow)               6
+  8  └‣─  (_)                               7
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "function"
+S2 "Q"
+S3 "program"
+S4 "function__regular"
+S5 "function__arrow"
+S6 "name"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { function }
+
+[type_members]
+M0: S1 → T0  ; function: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (_)                               2
+  2   !   switch
+            (function__regular)             7
+            (function__arrow)               8
+  3   !   (_ -name)                         5           [Node RecordSet(M0 function)]
+  5  ─‣┘  _                                 6
+  6       return
+  7   !   (function__regular)               3
+  8   !   (function__arrow)                 3

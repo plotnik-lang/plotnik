@@ -8,9 +8,9 @@ use crate::compiler::analyze::boundary::{BoundaryState, PendingAnchor};
 use crate::compiler::analyze::refs::DefinitionGraph;
 use crate::compiler::analyze::shape::PatternFacts;
 use crate::compiler::diagnostics::Span;
-use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::ids::DefId;
-use crate::compiler::parse::ast::{self, QuantifierKind, SeqItem, token_src};
+use crate::compiler::parse::ast::{self, QuantifierKind, SeqItem};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKind, NodeKindId};
@@ -112,8 +112,8 @@ impl Model {
         grammar: &Grammar,
         definitions: &DefinitionGraph,
         facts: &PatternFacts,
-        sources: &SourceMap,
         kinds: &HashMap<NodeKind<&str>, Option<NodeKindId>>,
+        selectors: &HashMap<String, Option<Vec<NodeKindId>>>,
         fields: &HashMap<&str, Option<NodeFieldId>>,
         expression: Option<&Located<ast::Pattern>>,
     ) -> Self {
@@ -122,8 +122,8 @@ impl Model {
             grammar,
             definitions,
             facts,
-            sources,
             kinds,
+            selectors,
             fields,
         };
         for &definition in definitions.ids_in_declaration_order() {
@@ -181,8 +181,8 @@ struct Builder<'a> {
     grammar: &'a Grammar,
     definitions: &'a DefinitionGraph,
     facts: &'a PatternFacts,
-    sources: &'a SourceMap,
     kinds: &'a HashMap<NodeKind<&'a str>, Option<NodeKindId>>,
+    selectors: &'a HashMap<String, Option<Vec<NodeKindId>>>,
     fields: &'a HashMap<&'a str, Option<NodeFieldId>>,
 }
 
@@ -192,17 +192,20 @@ impl Builder<'_> {
         let syntax = uncaptured(origin.node().clone());
         let kind = match &syntax {
             ast::Pattern::NamedNodePattern(node) => {
-                let kind = if node.is_any() {
-                    KindConstraint::AnyNamed
+                let kinds = if node.is_any() {
+                    vec![KindConstraint::AnyNamed]
                 } else {
                     let token = node.kind_token().expect("validated node has a kind");
                     if matches!(token.kind(), SyntaxKind::KwError | SyntaxKind::KwMissing) {
-                        KindConstraint::Unconstrained
+                        vec![KindConstraint::Unconstrained]
                     } else {
-                        self.kind(NodeKind::Named(token_src(
-                            &token,
-                            self.sources.content(source),
-                        )))
+                        self.selectors[&node.selector_name()]
+                            .as_ref()
+                            .expect("validated selector was resolved by binding")
+                            .iter()
+                            .copied()
+                            .map(KindConstraint::Exact)
+                            .collect()
                     }
                 };
                 let items: Vec<_> = node.items().collect();
@@ -218,34 +221,60 @@ impl Builder<'_> {
                         }
                     })
                     .collect();
-                let violation = match kind {
-                    KindConstraint::Exact(kind) => {
-                        if node.predicate().is_some()
-                            && self.grammar.has_declared_child_structure(kind)
-                        {
-                            Some(NodeViolation::PredicateOnNonLeaf)
-                        } else {
-                            negated_fields.iter().find_map(|&field| {
-                                (!self.grammar.has_field(kind, field.id))
-                                    .then_some(NodeViolation::FieldNotOnKind(field))
-                            })
-                        }
-                    }
-                    _ => None,
+                let concrete: Vec<_> = kinds
+                    .iter()
+                    .filter_map(|kind| match kind {
+                        KindConstraint::Exact(id) => Some(*id),
+                        _ => None,
+                    })
+                    .collect();
+                let predicate_non_leaf = concrete.iter().copied().find(|&kind| {
+                    node.predicate().is_some() && self.grammar.has_declared_child_structure(kind)
+                });
+                let violation = if predicate_non_leaf.is_some() {
+                    Some(NodeViolation::PredicateOnNonLeaf)
+                } else {
+                    negated_fields.iter().find_map(|&field| {
+                        (!concrete.is_empty()
+                            && concrete
+                                .iter()
+                                .all(|&kind| !self.grammar.has_field(kind, field.id)))
+                        .then_some(NodeViolation::FieldNotOnKind(field))
+                    })
                 };
-                PatternKind::Node(Node {
-                    kind,
-                    violation,
-                    children: self.items(source, &items),
-                    negated_fields,
-                })
+                let children = self.items(source, &items);
+                let make_node = |kind| {
+                    PatternKind::Node(Node {
+                        kind,
+                        violation,
+                        children: children.clone(),
+                        negated_fields: negated_fields.clone(),
+                    })
+                };
+                if violation.is_some() || kinds.len() == 1 {
+                    let kind = match predicate_non_leaf {
+                        Some(id) => KindConstraint::Exact(id),
+                        None => kinds[0],
+                    };
+                    make_node(kind)
+                } else {
+                    let members = kinds
+                        .into_iter()
+                        .map(|kind| {
+                            let id = PatternId(self.model.patterns.len());
+                            self.model.patterns.push(Pattern {
+                                origin: origin.clone(),
+                                kind: make_node(kind),
+                            });
+                            id
+                        })
+                        .collect();
+                    PatternKind::Alternative(members)
+                }
             }
             ast::Pattern::AnonymousNodePattern(node) => {
                 let token = node.value().expect("validated anonymous node has a value");
-                PatternKind::Leaf(self.kind(NodeKind::Anonymous(token_src(
-                    &token,
-                    self.sources.content(source),
-                ))))
+                PatternKind::Leaf(self.kind(NodeKind::Anonymous(token.text())))
             }
             ast::Pattern::NodeWildcard(_) => PatternKind::Leaf(KindConstraint::AnyNode),
             ast::Pattern::CapturedPattern(_) => unreachable!("captures were unwrapped"),

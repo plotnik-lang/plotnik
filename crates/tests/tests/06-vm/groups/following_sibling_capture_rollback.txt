@@ -1,0 +1,143 @@
+Q = (program
+  (function
+    parameter: (identifier) @parameter
+  ) @chosen
+  .
+  (plain
+    (identifier == "keep") @tail
+  )
+)
+--------------- INPUT (input.txt) ----------------
+arrow(leaked) => reject;
+plain wrong;
+fn chosen(kept) {}
+plain keep;
+--------------------- OUTPUT ---------------------
+{
+  "chosen": {
+    "kind": "function__regular",
+    "span": [38, 56],
+    "text": "fn chosen(kept) {}"
+  },
+  "parameter": {
+    "kind": "identifier",
+    "span": [48, 52],
+    "text": "kept"
+  },
+  "tail": {
+    "kind": "identifier",
+    "span": [63, 67],
+    "text": "keep"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "keep"
+S02 "chosen"
+S03 "parameter"
+S04 "tail"
+S05 "Q"
+S06 "program"
+S07 "function__regular"
+S08 "function__arrow"
+S09 "identifier"
+S10 "plain"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:3  ; { chosen, parameter, tail }
+
+[type_members]
+M0: S02 → T0  ; chosen: <Node>
+M1: S03 → T0  ; parameter: <Node>
+M2: S04 → T0  ; tail: <Node>
+
+[type_names]
+N0: S05 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └─!  _                                16, 17
+  03  └‣─  (identifier == "keep")           05          [Node RecordSet(M2 tail)]
+  05  ─‣┘² _                                09
+  06  └‣─  parameter: (identifier)          08          [Node RecordSet(M1 parameter)]
+  08  ─‣┘  _                                10
+  09       return
+  10  ─•─  (plain)                          03
+  11   !   (_)                              06          [Node RecordSet(M0 chosen)]
+  13   !   (function__regular)              11
+  14   !   (function__arrow)                11
+  15   !   switch
+             (function__regular)            13
+             (function__arrow)              14
+  16   !   (_)                              15
+  17  ──!  _                                16, 17
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └─!  _                                16, 17
+       ●   (function__arrow)
+  16   !   (_)                              15
+       ●   (function__arrow)
+  15   ●   switch (function__arrow)         14
+  14   !   (function__arrow)                11
+       ●   (function__arrow)
+  11   !   (_)                              06          [Node RecordSet(M0 chosen)]
+       ●   (function__arrow)
+  06  └‣─  parameter: (identifier)          08          [Node RecordSet(M1 parameter)]
+       ○   "arrow"
+       ○   "("
+       ●   parameter: (identifier)
+  08  ─‣┘  _                                10
+       ●   (function__arrow)
+  10  ─•─  (plain)                          03
+       ●   (plain)
+  03  └‣─  (identifier == "keep")           05          [Node RecordSet(M2 tail)]
+       ○   "plain"
+       ○   (identifier) "wrong"
+       ○   ";"
+       ○   no candidate
+  06  ❮❮❮
+  06  └‣─  parameter: (identifier)          08          [Node RecordSet(M1 parameter)]
+       ○   ")"
+       ○   "=>"
+       ○   value: (identifier)
+       ○   ";"
+       ○   no candidate
+  01  ❮❮❮
+  17  ──!  _                                16, 17
+       ●   (plain)
+  16   !   (_)                              15
+       ●   (plain)
+  15   ○   switch (plain)
+  17  ❮❮❮
+  17  ──!  _                                16, 17
+       ●   (function__regular)
+  16   !   (_)                              15
+       ●   (function__regular)
+  15   ●   switch (function__regular)       13
+  13   !   (function__regular)              11
+       ●   (function__regular)
+  11   !   (_)                              06          [Node RecordSet(M0 chosen)]
+       ●   (function__regular)
+  06  └‣─  parameter: (identifier)          08          [Node RecordSet(M1 parameter)]
+       ○   "fn"
+       ○   name: (identifier)
+       ○   "("
+       ●   parameter: (identifier)
+  08  ─‣┘  _                                10
+       ●   (function__regular)
+  10  ─•─  (plain)                          03
+       ●   (plain)
+  03  └‣─  (identifier == "keep")           05          [Node RecordSet(M2 tail)]
+       ○   "plain"
+       ●   (identifier) "keep"
+  05  ─‣┘² _                                09
+       ●   (program)
+  09   ◀   return                           ◼

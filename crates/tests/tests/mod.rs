@@ -10,6 +10,7 @@
 //!
 //! `INPUT` contains JavaScript source. Use a filename to select another language:
 //! `INPUT (index.ts)` for TypeScript or `INPUT (index.dart)` for Dart.
+//! `INPUT (input.txt)` selects the local synthetic execution-test grammar.
 //! `INPUT (file.ptk)` adds query definitions to the same workspace. Use multiple
 //! PTK inputs only when testing workspace composition. Each keeps its filename
 //! and line numbers in diagnostics. Put all inputs before generated sections.
@@ -574,6 +575,10 @@ impl Lang {
                 grammar: dart_grammar(),
                 ts: tree_sitter_dart::LANGUAGE.into(),
             },
+            Language::Groups => Self::Source {
+                grammar: groups_grammar(),
+                ts: tree_sitter_groups::LANGUAGE.into(),
+            },
         }
     }
 
@@ -611,6 +616,11 @@ grammar_loader!(
     dart_grammar,
     support::grammar_loader::dart_grammar_json,
     "dart grammar"
+);
+grammar_loader!(
+    groups_grammar,
+    support::grammar_loader::groups_grammar_json,
+    "groups grammar"
 );
 grammar_loader!(
     javascript_grammar,

@@ -61,9 +61,6 @@ pub enum SyntaxKind {
     #[token("/")]
     Slash,
 
-    #[token("#")]
-    Hash,
-
     #[token(",")]
     Comma,
 
@@ -116,6 +113,7 @@ pub enum SyntaxKind {
 
     #[regex(r"//[^\n]*", allow_greedy = true)]
     #[regex(r";[^\n]*", allow_greedy = true)]
+    #[regex(r"#[^\n]*", allow_greedy = true)]
     LineComment,
 
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
@@ -141,12 +139,6 @@ pub enum SyntaxKind {
 
     #[token("!~")]
     OpRegexNoMatch,
-
-    #[regex(r"=~[ \t\r\n]*/", lex_regex_predicate)]
-    RegexPredicateMatch,
-
-    #[regex(r"!~[ \t\r\n]*/", lex_regex_predicate)]
-    RegexPredicateNoMatch,
 
     RegexLiteral,
 
@@ -178,27 +170,6 @@ pub enum SyntaxKind {
 }
 
 use SyntaxKind::*;
-
-fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
-    let remaining = lexer.remainder();
-    let mut backslash_count = 0;
-
-    let mut line_end = remaining.len();
-    for (i, c) in remaining.char_indices() {
-        if c == '/' && backslash_count % 2 == 0 {
-            lexer.bump(i + 1);
-            return true;
-        }
-        if c == '\n' {
-            line_end = i;
-            break;
-        }
-        backslash_count = if c == '\\' { backslash_count + 1 } else { 0 };
-    }
-
-    lexer.bump(line_end);
-    true
-}
 
 impl SyntaxKind {
     #[inline]

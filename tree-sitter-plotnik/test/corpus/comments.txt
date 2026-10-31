@@ -3,12 +3,14 @@ Comment styles
 ================================================================================
 ; semicolon line comment
 // double-slash line comment
+# hash line comment
 /* block
    comment */
 Q = (a) /* inline */ ; trailing
 --------------------------------------------------------------------------------
 
 (source_file
+  (comment)
   (comment)
   (comment)
   (comment)
@@ -56,3 +58,69 @@ Q = (a)
     (type_identifier)
     (named_node
       (identifier))))
+
+================================================================================
+Hash comments replace qualifiers and predicate helpers
+================================================================================
+#eq? @name "not a predicate"
+Q = (literal#number) comment to end of line
+  # child comment
+)
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (comment)
+      (comment))))
+
+================================================================================
+Strings and regex shield hash after comments
+================================================================================
+Text = (identifier == "#value")
+Single = '#value'
+Regex = (identifier =~ # before regex
+  /* block */ /#value/)
+Slash = (identifier !~ // before regex
+  /#other/)
+Semi = (identifier =~ ; before regex
+  /#semi/)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (predicate
+        (string
+          (string_content)))))
+  (definition
+    (type_identifier)
+    (string
+      (string_content)))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (predicate
+        (comment)
+        (comment)
+        (regex))))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (predicate
+        (comment)
+        (regex))))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (predicate
+        (comment)
+        (regex)))))

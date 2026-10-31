@@ -361,11 +361,38 @@ impl NamedNodePattern {
         })
     }
 
-    pub fn has_supertype_marker(&self) -> bool {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .any(|t| matches!(t.kind(), SyntaxKind::Hash | SyntaxKind::Slash))
+    /// The member of a tight `group/member` selector, excluding child nodes.
+    pub fn member_token(&self) -> Option<SyntaxToken> {
+        let head = self.kind_token()?;
+        let slash = head.next_sibling_or_token()?.into_token()?;
+        if slash.kind() != SyntaxKind::Slash {
+            return None;
+        }
+
+        let member = slash.next_sibling_or_token()?.into_token()?;
+        (member.kind() == SyntaxKind::Id).then_some(member)
+    }
+
+    /// The selector head through its member, or just the head when unqualified.
+    /// An empty, incomplete node falls back to its full syntax range.
+    pub fn selector_range(&self) -> TextRange {
+        let Some(head) = self.kind_token() else {
+            return self.0.text_range();
+        };
+
+        let end = self
+            .member_token()
+            .map_or(head.text_range().end(), |token| token.text_range().end());
+        TextRange::new(head.text_range().start(), end)
+    }
+
+    /// Selector spelling for callers that have validated the node head.
+    pub fn selector_name(&self) -> String {
+        let head = self.kind_token().expect("validated named node has a head");
+        match self.member_token() {
+            Some(member) => format!("{}/{member}", head.text()),
+            None => head.text().to_owned(),
+        }
     }
 
     pub fn is_any(&self) -> bool {

@@ -1,0 +1,132 @@
+Q = (program
+  [
+    [
+      (function/regular
+        name: (identifier) @leaked :: text
+        body: (block (identifier))
+      )
+      (plain) @plain :: text
+    ]
+    (function
+      name: (identifier) @name :: text
+    )
+  ]
+)
+--------------- INPUT (input.txt) ----------------
+fn chosen() {}
+fn later() { content }
+--------------------- OUTPUT ---------------------
+{
+  "leaked": null,
+  "name": "chosen",
+  "plain": null
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "leaked"
+S02 "plain"
+S03 "name"
+S04 "Q"
+S05 "program"
+S06 "function__regular"
+S07 "identifier"
+S08 "block"
+S09 "function__arrow"
+S10 "body"
+
+[type_defs]
+T0 = <Text>
+T1 = Option(T0)  ; <Text>?
+T2 = Record  M0:3  ; { leaked, plain, name }
+
+[type_members]
+M0: S01 → T1  ; leaked: T1
+M1: S02 → T1  ; plain: T1
+M2: S03 → T1  ; name: T1
+
+[type_names]
+N0: S04 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └─!  _                                23, 34, 35
+  03  └‣─  (identifier)                     04
+  04  ─‣┘² _                                37
+  05  -ε-                                   07          [TextClose RecordSet(M2 name)]
+  07  ─‣┘  _                                37
+  08       return
+  09  ─‣─  body: (block)                    03
+  10  -ε-                                   09          [TextClose RecordSet(M0 leaked)]
+  12  └‣─  name: (identifier)               10          [ScalarMark]
+  14  -ε-                                   12          [ScalarOpen]
+  16   !   (function__regular)              14          [Absent RecordSet(M2 name) Absent RecordSet(M1 plain)]
+  19   !   (plain)                          37          [Absent RecordSet(M2 name) Absent RecordSet(M0 leaked) NodeText RecordSet(M1 plain)]
+  22  -ε-                                   19
+  23   !   switch
+             (function__regular)            16
+             (plain)                        22
+  24  └‣─  name: (identifier)               05          [ScalarMark]
+  26  -ε-                                   24          [ScalarOpen]
+  28   !   (_)                              26          [Absent RecordSet(M0 leaked) Absent RecordSet(M1 plain)]
+  31   !   (function__regular)              28
+  32   !   (function__arrow)                28
+  33   !   switch
+             (function__regular)            31
+             (function__arrow)              32
+  34   !   (_)                              33
+  35  ──!  _                                23, 34, 35
+  37  ─‣┘  _                                08
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └─!  _                                23, 34, 35
+       ●   (function__regular)
+  23   ●   switch (function__regular)       16
+  16   !   (function__regular)              14          [Absent RecordSet(M2 name) Absent RecordSet(M1 plain)]
+       ●   (function__regular)
+  14  -ε-                                   12          [ScalarOpen]
+  12  └‣─  name: (identifier)               10          [ScalarMark]
+       ○   "fn"
+       ●   name: (identifier)
+  10  -ε-                                   09          [TextClose RecordSet(M0 leaked)]
+  09  ─‣─  body: (block)                    03
+       ○   "("
+       ○   ")"
+       ●   body: (block)
+  03  └‣─  (identifier)                     04
+       ○   "{"
+       ○   "}"
+       ○   no candidate
+  09  ❮❮❮
+  09  ─‣─  body: (block)                    03
+       ○   no candidate
+  12  ❮❮❮
+  12  └‣─  name: (identifier)               10          [ScalarMark]
+       ○   "("
+       ○   ")"
+       ○   body: (block)
+       ○   no candidate
+  01  ❮❮❮
+  34   !   (_)                              33
+       ●   (function__regular)
+  33   ●   switch (function__regular)       31
+  31   !   (function__regular)              28
+       ●   (function__regular)
+  28   !   (_)                              26          [Absent RecordSet(M0 leaked) Absent RecordSet(M1 plain)]
+       ●   (function__regular)
+  26  -ε-                                   24          [ScalarOpen]
+  24  └‣─  name: (identifier)               05          [ScalarMark]
+       ○   "fn"
+       ●   name: (identifier)
+  05  -ε-                                   07          [TextClose RecordSet(M2 name)]
+  07  ─‣┘  _                                37
+       ●   (function__regular)
+  37  ─‣┘  _                                08
+       ●   (program)
+  08   ◀   return                           ◼

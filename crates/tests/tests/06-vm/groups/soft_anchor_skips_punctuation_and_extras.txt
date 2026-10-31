@@ -1,0 +1,100 @@
+Q = (program
+  (function
+    parameter: (identifier) @parameter
+    .
+    value: (identifier) @value
+  )
+)
+--------------- INPUT (input.txt) ----------------
+arrow(input /* block */) => // line
+output;
+--------------------- OUTPUT ---------------------
+{
+  "parameter": {
+    "kind": "identifier",
+    "span": [6, 11],
+    "text": "input"
+  },
+  "value": {
+    "kind": "identifier",
+    "span": [36, 42],
+    "text": "output"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "parameter"
+S2 "value"
+S3 "Q"
+S4 "program"
+S5 "function__regular"
+S6 "function__arrow"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:2  ; { parameter, value }
+
+[type_members]
+M0: S1 → T0  ; parameter: <Node>
+M1: S2 → T0  ; value: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (function__arrow)              07
+             (function__regular)            15
+  03  ─•─  value: (identifier)              05          [Node RecordSet(M1 value)]
+  05  ─‣┘² _                                06
+  06       return
+  07   !   (function__arrow)                14
+  08   !   parameter: (identifier)          03          [Node RecordSet(M0 parameter)]
+  10  ──!  _                                08, 10
+  12  └─!  _                                08, 10
+  14   !   (_)                              12
+  15   !   (function__regular)              14
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (function__arrow)
+  02   ●   switch (function__arrow)         07
+  07   !   (function__arrow)                14
+       ●   (function__arrow)
+  14   !   (_)                              12
+       ●   (function__arrow)
+  12  └─!  _                                08, 10
+       ●   "arrow"
+  08   !   parameter: (identifier)          03          [Node RecordSet(M0 parameter)]
+       ○   "arrow"
+       ○   no candidate
+  12  ❮❮❮
+  10  ──!  _                                08, 10
+       ●   "("
+  08   !   parameter: (identifier)          03          [Node RecordSet(M0 parameter)]
+       ○   "("
+       ○   no candidate
+  10  ❮❮❮
+  10  ──!  _                                08, 10
+       ●   (identifier)
+  08   !   parameter: (identifier)          03          [Node RecordSet(M0 parameter)]
+       ●   parameter: (identifier)
+  03  ─•─  value: (identifier)              05          [Node RecordSet(M1 value)]
+       ○   (comment__block)
+       ○   ")"
+       ○   "=>"
+       ○   (comment__line)
+       ●   value: (identifier)
+  05  ─‣┘² _                                06
+       ●   (program)
+  06   ◀   return                           ◼

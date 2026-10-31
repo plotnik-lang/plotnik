@@ -33,7 +33,39 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             return;
         }
 
-        self.bind_named_kind(located.source(), &type_token);
+        let name = node.selector_name();
+        if self.named_selectors.contains_key(&name) {
+            return;
+        }
+
+        let resolved = self.grammar.resolve_named_selector(&name);
+        self.named_selectors.insert(name.clone(), resolved.clone());
+        if let Some(ids) = resolved {
+            for &id in &ids {
+                let concrete = self.grammar.node_kind(id).expect("bound kind has a name");
+                let sym = self.interner.intern(concrete);
+                self.output.insert_node_kind_id(NodeKind::Named(sym), id);
+            }
+            self.output.insert_named_selector(name, ids);
+            return;
+        }
+
+        if let Some((group, member)) = name.split_once("__")
+            && self.grammar.resolve_named_node(&name).is_some()
+        {
+            let selector = format!("{group}/{member}");
+            self.diag
+                .report(
+                    DiagnosticKind::InvalidNodeSelector,
+                    located.span_of(node.selector_range()),
+                )
+                .detail(&name)
+                .fix(format!("write `{selector}`"), selector)
+                .emit();
+            return;
+        }
+
+        self.report_unknown_named_kind(&name, located.span_of(node.selector_range()));
     }
 
     fn resolve_missing_node(&mut self, located: &Located<NamedNodePattern>) {
@@ -72,7 +104,10 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             return cached;
         }
 
-        let resolved = self.grammar.resolve_named_node(type_name);
+        let resolved = self
+            .grammar
+            .resolve_named_selector(type_name)
+            .and(self.grammar.resolve_named_node(type_name));
         self.node_kind_ids.insert(key, resolved);
         if let Some(id) = resolved {
             let sym = self.interner.intern(type_name);
@@ -80,20 +115,28 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
             return Some(id);
         }
 
-        let all_types = self.grammar.all_named_node_kinds();
-        let suggestion = find_similar(type_name, &all_types);
+        self.report_unknown_named_kind(type_name, Span::new(source, token.text_range()));
+        None
+    }
+
+    fn report_unknown_named_kind(&mut self, name: &str, span: Span) {
+        let all_types = self
+            .grammar
+            .all_named_node_kinds()
+            .into_iter()
+            .filter(|name| !name.contains("__"))
+            .collect::<Vec<_>>();
+        let suggestion = find_similar(name, &all_types);
+
         let mut builder = self
             .diag
-            .report(
-                DiagnosticKind::UnknownNodeKind,
-                Span::new(source, token.text_range()),
-            )
-            .detail(type_name);
+            .report(DiagnosticKind::UnknownNodeKind, span)
+            .detail(name);
         if let Some(similar) = suggestion {
             builder = builder.fix(format!("replace with `{similar}`"), similar);
         }
+
         builder.emit();
-        None
     }
 
     fn bind_anonymous_kind(
@@ -172,21 +215,17 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
         &self,
         located: &Located<NamedNodePattern>,
     ) -> Option<NodeKindId> {
-        let node = located.node();
-        if node.is_any() {
-            return None;
-        }
+        let ids = self.resolve_named_node_ids(located)?;
+        (ids.len() == 1).then(|| ids[0])
+    }
 
-        let type_token = node.kind_token().expect("validated node has a kind");
-        if matches!(
-            type_token.kind(),
-            SyntaxKind::KwError | SyntaxKind::KwMissing
-        ) {
-            return None;
-        }
-
-        let key = NodeKind::Named(token_src(&type_token, self.content(located.source())));
-        self.node_kind_ids.get(&key).copied().flatten()
+    pub(super) fn resolve_named_node_ids(
+        &self,
+        located: &Located<NamedNodePattern>,
+    ) -> Option<&[NodeKindId]> {
+        self.named_selectors
+            .get(&located.node().selector_name())?
+            .as_deref()
     }
 }
 

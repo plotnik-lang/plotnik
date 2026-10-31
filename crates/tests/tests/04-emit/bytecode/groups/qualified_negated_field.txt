@@ -1,0 +1,12 @@
+Q = (program (function/arrow -name))
+--------------- INPUT (input.txt) ----------------
+------------------ DIAGNOSTICS -------------------
+error: `name` is not a grammar field of `function__arrow`
+ --> query.ptk:1:30
+  |
+1 | Q = (program (function/arrow -name))
+  |               --------       ^^^^^
+  |               |
+  |               `function__arrow` starts here
+  |
+help: remove `-name`

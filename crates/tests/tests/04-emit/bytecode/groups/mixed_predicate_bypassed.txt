@@ -1,0 +1,61 @@
+Q = (program
+  [
+    (value == "unit")
+    (plain)
+  ]
+)
+--------------- INPUT (input.txt) ----------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 02
+
+[transitions]
+Q:
+  01       return
+  02   !   (program)                        13
+  03  ─‣┘  _                                01
+  04   !   (_ == "unit")                    03
+  05   !   (value__leaf)                    04
+  06   !   (value__group)                   04
+  07   !   switch
+             (value__leaf)                  05
+             (value__group)                 06
+  08   !   (_)                              07
+  09   !   (plain)                          03
+  12  ──!  _                                08, 09, 12
+  13  └─!  _                                08, 09, 12
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "unit"
+S2 "program"
+S3 "value__leaf"
+S4 "value__group"
+S5 "plain"
+S6 "Q"
+
+[type_defs]
+T0 = <NoValue>
+
+[type_members]
+
+[type_names]
+
+[entrypoints]
+Q = 00 :: T0
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └─!  _                                09, 10, 11
+  03       return
+  04   !   (_ == "unit")                    13
+  06   !   (value__leaf)                    04
+  07   !   (value__group)                   04
+  08   !   switch
+             (value__leaf)                  06
+             (value__group)                 07
+  09   !   (_)                              08
+  10   !   (plain)                          13
+  11  ──!  _                                09, 10, 11
+  13  ─‣┘  _                                03

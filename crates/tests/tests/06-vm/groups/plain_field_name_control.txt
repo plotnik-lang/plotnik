@@ -1,0 +1,57 @@
+Q = (program
+  (plain
+    label__name: (identifier) @name
+  )
+)
+--------------- INPUT (input.txt) ----------------
+plain control;
+--------------------- OUTPUT ---------------------
+{
+  "name": {
+    "kind": "identifier",
+    "span": [6, 13],
+    "text": "control"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "Q"
+S3 "program"
+S4 "plain"
+S5 "identifier"
+S6 "label__name"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { name }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[instructions]
+Q:
+  0   !   (program)                         1
+  1  └‣─  (plain)                           2
+  2  └‣─  label__name: (identifier)         4           [Node RecordSet(M0 name)]
+  4  ─‣┘² _                                 5
+  5       return
+--------------------- TRACE ----------------------
+Q:
+  0   !   (program)                         1
+      ●   (program)
+  1  └‣─  (plain)                           2
+      ●   (plain)
+  2  └‣─  label__name: (identifier)         4           [Node RecordSet(M0 name)]
+      ○   "plain"
+      ●   label__name: (identifier)
+  4  ─‣┘² _                                 5
+      ●   (program)
+  5   ◀   return                            ◼

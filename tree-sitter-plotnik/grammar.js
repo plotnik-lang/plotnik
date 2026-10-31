@@ -78,25 +78,15 @@ module.exports = grammar({
         seq("(", field("kind", $.wildcard), repeat($._child), ")"),
         seq(
           "(",
-          field("kind", $.identifier),
-          optional($._refinement),
+          field("kind", choice($.identifier, $.group_selector)),
           optional($.predicate),
           repeat($._child),
           ")",
         ),
       ),
 
-    _refinement: ($) =>
-      choice(
-        seq(token.immediate("#"), optional(field("subtype", $._subtype))),
-        seq(token.immediate("/"), field("subtype", $._subtype)),
-      ),
-
-    _subtype: ($) =>
-      choice(
-        alias(token.immediate(/[a-zA-Z][a-zA-Z0-9_.\-]*/), $.identifier),
-        alias(token.immediate(/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/), $.string),
-      ),
+    group_selector: (_) =>
+      /[a-z][a-z0-9]*(_[a-z0-9]+)*\/[a-z][a-z0-9]*(_[a-z0-9]+)*/,
 
     predicate: ($) =>
       choice(
@@ -208,7 +198,8 @@ module.exports = grammar({
         ),
       ),
 
-    regex: (_) => /\/([^\/\\\n]|\\[^\n])*\//,
+    // A leading `/*` is a query comment, not a regex with an invalid `*` head.
+    regex: (_) => /\/(([^\/\\\n*]|\\[^\n])([^\/\\\n]|\\[^\n])*)?\//,
 
     identifier: (_) => /[a-z][a-zA-Z0-9_.\-]*/,
 
@@ -219,6 +210,8 @@ module.exports = grammar({
     discard: (_) => /@_[a-z0-9_]*/,
 
     comment: (_) =>
-      token(choice(/\/\/[^\n]*/, /;[^\n]*/, /\/\*([^*]|\*[^\/])*\*\//)),
+      token(
+        choice(/#[^\n]*/, /\/\/[^\n]*/, /;[^\n]*/, /\/\*([^*]|\*[^\/])*\*\//),
+      ),
   },
 });

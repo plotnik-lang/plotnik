@@ -61,11 +61,6 @@ impl Parser<'_, '_> {
             return false;
         }
 
-        if self.at_ts_predicate() {
-            self.error_unsupported_predicate();
-            return false;
-        }
-
         self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
             report
                 .detail("expected a pattern")
@@ -99,11 +94,6 @@ impl Parser<'_, '_> {
                 SuffixMode::Apply => self.parse_pattern(),
                 SuffixMode::Skip => self.parse_pattern_no_suffix(),
             }
-            return;
-        }
-
-        if self.at_ts_predicate() {
-            self.error_unsupported_predicate();
             return;
         }
 

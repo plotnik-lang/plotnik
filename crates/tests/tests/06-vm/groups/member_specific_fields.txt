@@ -1,0 +1,114 @@
+Q = (program
+  (function
+    name: (identifier) @name
+    body: (block
+      (identifier) @body
+    )
+  ) @function
+)
+--------------- INPUT (input.txt) ----------------
+arrow(ignored) => wrong_shape;
+fn chosen(parameter) { content }
+--------------------- OUTPUT ---------------------
+{
+  "body": {
+    "kind": "identifier",
+    "span": [54, 61],
+    "text": "content"
+  },
+  "function": {
+    "kind": "function__regular",
+    "span": [31, 63],
+    "text": "fn chosen(parameter) { content }"
+  },
+  "name": {
+    "kind": "identifier",
+    "span": [34, 40],
+    "text": "chosen"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "function"
+S2 "name"
+S3 "body"
+S4 "Q"
+S5 "program"
+S6 "function__regular"
+S7 "function__arrow"
+S8 "identifier"
+S9 "block"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:3  ; { function, name, body }
+
+[type_members]
+M0: S1 → T0  ; function: <Node>
+M1: S2 → T0  ; name: <Node>
+M2: S3 → T0  ; body: <Node>
+
+[type_names]
+N0: S4 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (function__regular)            12
+             (function__arrow)              13
+  03  └‣─  (identifier)                     05          [Node RecordSet(M2 body)]
+  05  ─‣┘³ _                                06
+  06       return
+  07  ─‣─  body: (block)                    03
+  08  └‣─  name: (identifier)               07          [Node RecordSet(M1 name)]
+  10   !   (_)                              08          [Node RecordSet(M0 function)]
+  12   !   (function__regular)              10
+  13   !   (function__arrow)                10
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (function__arrow)
+  02   ●   switch (function__arrow)         13
+  13   !   (function__arrow)                10
+       ●   (function__arrow)
+  10   !   (_)                              08          [Node RecordSet(M0 function)]
+       ●   (function__arrow)
+  08  └‣─  name: (identifier)               07          [Node RecordSet(M1 name)]
+       ○   "arrow"
+       ○   "("
+       ○   parameter: (identifier)
+       ○   ")"
+       ○   "=>"
+       ○   value: (identifier)
+       ○   ";"
+       ○   no candidate
+  01  ❮❮❮
+  01  └‣─  (_)                              02
+       ●   (function__regular)
+  02   ●   switch (function__regular)       12
+  12   !   (function__regular)              10
+       ●   (function__regular)
+  10   !   (_)                              08          [Node RecordSet(M0 function)]
+       ●   (function__regular)
+  08  └‣─  name: (identifier)               07          [Node RecordSet(M1 name)]
+       ○   "fn"
+       ●   name: (identifier)
+  07  ─‣─  body: (block)                    03
+       ○   "("
+       ○   parameter: (identifier)
+       ○   ")"
+       ●   body: (block)
+  03  └‣─  (identifier)                     05          [Node RecordSet(M2 body)]
+       ○   "{"
+       ●   (identifier)
+  05  ─‣┘³ _                                06
+       ●   (program)
+  06   ◀   return                           ◼

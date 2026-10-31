@@ -1,0 +1,57 @@
+String = (identifier == "#value")
+Single = '#literal'
+Regex = (identifier =~ /#value\/#tail/)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "String"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      Whitespace " "
+      NodePredicate
+        OpEq "=="
+        Whitespace " "
+        DoubleQuote "\""
+        StringContent "#value"
+        DoubleQuote "\""
+      ParenClose ")"
+  Newline "\n"
+  Def
+    Id "Single"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    Str
+      SingleQuote "'"
+      StringContent "#literal"
+      SingleQuote "'"
+  Newline "\n"
+  Def
+    Id "Regex"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      Whitespace " "
+      NodePredicate
+        OpRegexMatch "=~"
+        Whitespace " "
+        Regex
+          RegexLiteral "/#value\\/#tail/"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def String
+    NamedNode identifier
+  Def Single
+    AnonymousNode "#literal"
+  Def Regex
+    NamedNode identifier

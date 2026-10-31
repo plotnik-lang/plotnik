@@ -1,0 +1,83 @@
+Q = (program
+  (function
+    "("
+    .!
+    (identifier) @parameter
+  )
+)
+--------------- INPUT (input.txt) ----------------
+arrow(input) => output;
+--------------------- OUTPUT ---------------------
+{
+  "parameter": {
+    "kind": "identifier",
+    "span": [6, 11],
+    "text": "input"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "parameter"
+S2 "Q"
+S3 "program"
+S4 "function__regular"
+S5 "function__arrow"
+S6 "("
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Record  M0:1  ; { parameter }
+
+[type_members]
+M0: S1 → T0  ; parameter: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[instructions]
+Q:
+  00   !   (program)                        01
+  01  └‣─  (_)                              02
+  02   !   switch
+             (function__regular)            13
+             (function__arrow)              14
+  03  ──!  (identifier)                     05          [Node RecordSet(M0 parameter)]
+  05  ─‣┘² _                                06
+  06       return
+  07   !   "("                              03
+  08  ──!  _                                07, 08
+  10  └─!  _                                07, 08
+  12   !   (_)                              10
+  13   !   (function__regular)              12
+  14   !   (function__arrow)                12
+--------------------- TRACE ----------------------
+Q:
+  00   !   (program)                        01
+       ●   (program)
+  01  └‣─  (_)                              02
+       ●   (function__arrow)
+  02   ●   switch (function__arrow)         14
+  14   !   (function__arrow)                12
+       ●   (function__arrow)
+  12   !   (_)                              10
+       ●   (function__arrow)
+  10  └─!  _                                07, 08
+       ●   "arrow"
+  07   !   "("                              03
+       ○   "arrow"
+       ○   no candidate
+  10  ❮❮❮
+  08  ──!  _                                07, 08
+       ●   "("
+  07   !   "("                              03
+       ●   "("
+  03  ──!  (identifier)                     05          [Node RecordSet(M0 parameter)]
+       ●   (identifier)
+  05  ─‣┘² _                                06
+       ●   (program)
+  06   ◀   return                           ◼

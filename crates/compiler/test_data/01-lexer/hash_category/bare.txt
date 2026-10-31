@@ -1,6 +1,0 @@
-(value#)
---------------------- TOKENS ---------------------
-ParenOpen "("
-Id "value"
-Hash "#"
-ParenClose ")"

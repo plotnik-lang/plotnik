@@ -8,6 +8,7 @@ members = [
     "crates/macros",
     "crates/runtime",
     "crates/tests",
+    "crates/tests/grammars/groups",
     "crates/web",
 ]
 [workspace.package]

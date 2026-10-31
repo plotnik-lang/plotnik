@@ -1,0 +1,258 @@
+Q = (program
+  (function
+    parameter: (identifier) @param
+  ) @function
+)
+--------------- INPUT (input.txt) ----------------
+-------------------- MATCHER ---------------------
+use ::plotnik_runtime as rt;
+
+const _: () = assert!(rt::RUNTIME_ABI == 0, "runtime interface mismatch");
+
+use ::plotnik_runtime::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub function: Node<'t>,
+    pub param: Node<'t>,
+}
+
+impl<'t> Q<'t> {
+    /// Apply `Q` once at a suitable node. A wrong node kind is no-match.
+    pub fn exec(
+        node: rt::Node<'t>,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        matcher::GRAMMAR.verify(node);
+        let mut eng = rt::MatcherEngine::new(node.walk());
+        let mut scratch = rt::DecoderScratch::default();
+        Self::apply(&mut eng, source, &mut scratch)
+    }
+
+    /// Search inclusively in source-order DFS preorder, skipping descendants of matches.
+    /// An error ends iteration.
+    pub fn each<'s>(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
+    + use<'t, 's> {
+        let mut eng = rt::MatcherEngine::new(scope.walk());
+        let mut scratch = rt::DecoderScratch::default();
+        rt::Traversal::new(scope, move |node: rt::Node<'t>| {
+            matcher::GRAMMAR.verify(node);
+            eng.reset(node);
+            Self::apply(&mut eng, source, &mut scratch)
+        })
+    }
+
+    /// Consume the first item of `each`.
+    pub fn find(
+        scope: rt::Node<'t>,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        <Self as rt::Execute<'_, '_>>::find(scope, source)
+    }
+
+    /// Collect `each`, returning an error rather than a partial vector.
+    pub fn find_all(
+        scope: rt::Node<'t>,
+        source: &str,
+    ) -> ::core::result::Result<::std::vec::Vec<Self>, rt::LimitExceeded> {
+        <Self as rt::Execute<'_, '_>>::find_all(scope, source)
+    }
+
+    fn apply(
+        eng: &mut rt::MatcherEngine<'t>,
+        source: &str,
+        scratch: &mut rt::DecoderScratch,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        let Some(journal) = matcher::q_apply(eng, source)? else {
+            return Ok(None);
+        };
+
+        let mut decoder = rt::ResultDecoder::new(journal.output_events(), source, scratch);
+        let value = decode_q(&mut decoder);
+        decoder.finish();
+        Ok(Some(value))
+    }
+}
+
+impl<'t, 's> rt::Execute<'t, 's> for Q<'t> {
+    type Item = Self;
+
+    fn exec(
+        node: rt::Node<'t>,
+        source: &'s str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        Self::exec(node, source)
+    }
+
+    fn each(
+        scope: rt::Node<'t>,
+        source: &'s str,
+    ) -> impl ::core::iter::FusedIterator<Item = ::core::result::Result<Self, rt::LimitExceeded>>
+    {
+        Self::each(scope, source)
+    }
+}
+
+/// Decode one committed `Q` value.
+fn decode_q<'t, 's>(decoder: &mut rt::ResultDecoder<'_, 't, 's>) -> Q<'t> {
+    decoder.expect_record_open();
+    let mut v0 = None; // function
+    let mut v1 = None; // param
+    while !decoder.at_record_close() {
+        match decoder.peek_record_set() {
+            // function
+            0 => v0 = Some(decoder.expect_node()),
+            // param
+            1 => v1 = Some(decoder.expect_node()),
+            other => unreachable!("journal shape proven at emit: `Q` has no member index {other}"),
+        }
+        decoder.expect_record_set();
+    }
+    decoder.expect_record_close();
+    Q {
+        function: v0.expect("field-stability: every accepting path sets `function`"),
+        param: v1.expect("field-stability: every accepting path sets `param`"),
+    }
+}
+
+mod matcher {
+    use ::plotnik_runtime as rt;
+    use rt::Flow;
+
+    pub(super) static GRAMMAR: rt::Grammar = rt::Grammar {
+        kinds: &[
+            (14, "identifier", true),
+            (17, "program", true),
+            (18, "function__regular", true),
+            (19, "function__arrow", true),
+        ],
+        fields: &[
+            (5, "parameter"),
+        ],
+        identity: None,
+    };
+    const F_PARAMETER: rt::NodeFieldId = rt::NodeFieldId::from_raw(5);
+
+    pub(super) fn q_apply<'a, 't>(eng: &'a mut rt::MatcherEngine<'t>, source: &str) -> Result<Option<&'a rt::MatchJournal<'t>>, rt::LimitExceeded> {
+        rt::Matcher { runner: run_0 }.run(eng, source, 0, rt::EntryBoundary::new(true, false))
+    }
+
+    // Q
+
+    pub(crate) fn run_0(eng: &mut rt::MatcherEngine<'_>, source: &str, mut block: u32) -> Flow {
+        let _ = (&eng, &source);
+        'run: loop {
+            return match block {
+                0 => {
+                    //   02   !   (program)                        10
+                    let node = eng.node();
+                    if node.kind_id() != 17 || !node.is_named() { return Flow::Backtrack; }
+                    //   10  └‣─  (_)                              09
+                    if eng.cursor_mut().navigate(rt::Nav::Down).is_none() { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(!node.is_named()) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    }
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 7u32));
+                    }
+                    block = 5;
+                    continue 'run;
+                }
+                1 => {
+                    //   04   !   (_)                              06          [Node RecordSet(function)]
+                    let node = eng.node();
+                    if !node.is_named() { return Flow::Backtrack; }
+                    eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                    eng.emit_output_event(|_| rt::JournalEvent::RecordSet(0));
+                    //   06  └‣─  parameter: (identifier)          05          [Node RecordSet(param)]
+                    if eng.cursor_mut().navigate(rt::Nav::Down).is_none() { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(node.kind_id() != 14 || !node.is_named() || eng.cursor().field_id() != Some(F_PARAMETER)) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    }
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 6u32));
+                    }
+                    eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                    eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1));
+                    block = 2;
+                    continue 'run;
+                }
+                2 => {
+                    //   05  ─‣┘² _                                01
+                    if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() { return Flow::Backtrack; }
+                    //   01       return
+                    Flow::Return(rt::PortId::from_raw(0))
+                }
+                3 => {
+                    //   07   !   (function__regular)              04
+                    let node = eng.node();
+                    if node.kind_id() != 18 || !node.is_named() { return Flow::Backtrack; }
+                    block = 1;
+                    continue 'run;
+                }
+                4 => {
+                    //   08   !   (function__arrow)                04
+                    let node = eng.node();
+                    if node.kind_id() != 19 || !node.is_named() { return Flow::Backtrack; }
+                    block = 1;
+                    continue 'run;
+                }
+                5 => {
+                    //   09   !   switch
+                    //              (function__regular)            07
+                    //              (function__arrow)              08
+                    let node = eng.node();
+                    match node.kind_id() {
+                        18 => {
+                            if !node.is_named() { return Flow::Backtrack; }
+                            block = 1;
+                            continue 'run;
+                        }
+                        19 => {
+                            if !node.is_named() { return Flow::Backtrack; }
+                            block = 1;
+                            continue 'run;
+                        }
+                        _ => Flow::Backtrack,
+                    }
+                }
+                6 => {
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(node.kind_id() != 14 || !node.is_named() || eng.cursor().field_id() != Some(F_PARAMETER)) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    }
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 6u32));
+                    }
+                    eng.emit_output_event(|c| rt::JournalEvent::Node(c.node()));
+                    eng.emit_output_event(|_| rt::JournalEvent::RecordSet(1));
+                    block = 2;
+                    continue 'run;
+                }
+                7 => {
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    loop {
+                        let node = eng.node();
+                        if !(!node.is_named()) { break; }
+                        if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) { return Flow::Backtrack; }
+                    }
+                    if rt::SkipPolicy::Any.admits(|| eng.node()) {
+                        eng.push_checkpoint(rt::Checkpoint::new(eng.checkpoint_state(), 7u32));
+                    }
+                    block = 5;
+                    continue 'run;
+                }
+                _ => unreachable!("invalid local runner block {block}"),
+            };
+        }
+    }
+}

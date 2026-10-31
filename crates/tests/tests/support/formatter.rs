@@ -111,7 +111,6 @@ fn significant_token_signature(source: &str, tokens: &[QueryToken]) -> Vec<(Stri
         .map(|token| {
             let text = &source[token.span.0 as usize..token.span.1 as usize];
             let normalized = match text {
-                "/" => "#",
                 "'" => "\"",
                 _ => text,
             };
@@ -126,7 +125,7 @@ fn comment_signature(source: &str, tokens: &[QueryToken]) -> Vec<String> {
         .filter(|token| token.kind == "comment")
         .map(|token| {
             let text = &source[token.span.0 as usize..token.span.1 as usize];
-            if text.starts_with("//") || text.starts_with(';') {
+            if text.starts_with("//") || text.starts_with([';', '#']) {
                 return text.trim_end_matches([' ', '\t']).to_owned();
             }
             text.replace("\r\n", "\n").replace('\r', "\n")
