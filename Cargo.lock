@@ -1349,23 +1349,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "plotnik-web"
-version = "0.4.0"
-dependencies = [
- "cargo_metadata",
- "cc",
- "plotnik-compiler",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "tree-sitter",
- "tree-sitter-javascript",
- "tree-sitter-language",
- "tree-sitter-typescript",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "plotters"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1761,17 +1744,6 @@ dependencies = [
  "num-traits",
  "serde_core",
  "smallvec",
-]
-
-[[package]]
-name = "serde-wasm-bindgen"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
-dependencies = [
- "js-sys",
- "serde",
- "wasm-bindgen",
 ]
 
 [[package]]

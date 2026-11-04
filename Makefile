@@ -1,8 +1,5 @@
-.PHONY: check clippy test codegen-rust lint-codegen-rust test-codegen-rust bench check-wasm wasm-web clean
+.PHONY: check clippy test codegen-rust lint-codegen-rust test-codegen-rust bench clean
 
-LLVM_PREFIX ?= /opt/homebrew/opt/llvm
-WASM_CC ?= $(LLVM_PREFIX)/bin/clang
-WASM_AR ?= $(LLVM_PREFIX)/bin/llvm-ar
 BENCH ?= vm
 CODEGEN_TARGET_DIR ?= $(if $(strip $(CARGO_TARGET_DIR)),$(abspath $(CARGO_TARGET_DIR)),$(CURDIR)/target)
 CODEGEN_RUST_DIR := $(CURDIR)/crates/tests/codegen/rust
@@ -115,25 +112,6 @@ bench:
 		--package plotnik-tests \
 		--bench $(BENCH) \
 		-- $(FILTER)
-
-check-wasm:
-	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
-		AR_wasm32_unknown_unknown="$(WASM_AR)" \
-		cargo check \
-		--package plotnik-web \
-		--target wasm32-unknown-unknown
-
-wasm-web:
-	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
-		AR_wasm32_unknown_unknown="$(WASM_AR)" \
-		cargo build \
-		--package plotnik-web \
-		--target wasm32-unknown-unknown \
-		--release
-	@wasm-bindgen \
-		--target web \
-		--out-dir web/src/lib/plotnik-web \
-		target/wasm32-unknown-unknown/release/plotnik_web.wasm
 
 fmt:
 	@cargo fmt --quiet

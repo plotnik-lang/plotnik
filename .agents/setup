@@ -38,19 +38,14 @@ step 'Ensure Rust lint and format components' rustup component add \
     --toolchain "$toolchain" rustfmt clippy
 
 # Amp and supervised services use new login shells, not this setup process.
-# Optional WASM tasks use Debian LLVM under /usr, not the Makefile's Homebrew default.
 profile_marker='# Plotnik orb toolchain'
 if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
     cat >> "$HOME/.bash_profile" <<EOF
 
 $profile_marker
 export PATH="$CARGO_HOME/bin:\$PATH"
-case "\$PWD" in
-    "$repo_root"|"$repo_root"/*) export LLVM_PREFIX=/usr ;;
-esac
 EOF
 fi
-export LLVM_PREFIX=/usr
 
 resource_marker='# Plotnik orb resource limits'
 if ! grep -Fqx "$resource_marker" "$HOME/.bash_profile" 2>/dev/null; then
