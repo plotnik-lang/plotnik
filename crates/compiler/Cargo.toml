@@ -45,5 +45,5 @@ wasm = ["vm", "tree-sitter/wasm"]
 insta = { version = "=1.48.0", features = ["yaml"] }
 indoc = "=2.0.7"
 proptest = "=1.11.0"
-serde_json = "=1.0.151"
+serde_json = "=1.0.154"
 similar = "=3.1.1"
